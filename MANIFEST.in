@@ -1,0 +1,2 @@
+include switools/ARISTA_ROOT_CA.crt
+include README.md

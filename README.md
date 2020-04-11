@@ -1,1 +1,169 @@
 # swi-tools
+Scripts for operating on an Arista SWI or SWIX
+
+A SWI is a SoftWare Image containing the software that will run on the switch when the image is booted.
+A SWIX is a SoftWare Image eXtension, a collection of files (ex RPMs, squashfs) that can be installed to extend the behavior of the base SWI.
+
+## Scripts
+* **swi-signature**: Add a cryptographic signature to an Arista SWI or SWIX
+* **verify-swi**: Verify the cryptographic signature of an Arista SWI or SWIX
+
+## Installation
+```
+git clone https://github.com/aristanetworks/swi-tools.git
+cd swi-tools
+python setup.py install
+```
+### Dependencies
+1. [Zip](http://infozip.sourceforge.net/) - Used in the `swi-signature` script to remove a signature from the SWI/X if you want to re-sign it, this comes preinstalled on many operating systems.
+2. [M2Crypto](https://pypi.org/project/M2Crypto/) - installed automatically with the setup script.
+
+## Signing an Arista SWI/X
+Signing an Arista SWI or SWIX is a multi-step process involving the `swi-signature` script. First, with `swi-signature prepare`,
+a null signature file (a fix-sized signature file made entirely of null bytes) is added to the SWI/X, at the path `/swi-signature` (for SWI files) or `/swix-signature` (for SWIX files) in the zip file. 
+Next, a signature is generated from the resulting SWI/X using a signing key. Finally, with `swi-signature sign`, the null signature file in the SWI/X is 
+updated to reflect both the signature that was generated and the signing certificate used to verify the signature.
+
+### 1. Preparing the SWI/X for signing
+Before generating a signature of the SWI/X, the SWI/X must be pre-signed with a null signature, a fix-sized signature file made entirely of null bytes. 
+This can be done with the `prepare` option in the `swi-signature` script. At the end of the preparation, the sha256 hash of the SWI/X with the null signature 
+is printed out in hex format. The hash is used in the next step to generate the real signature of the SWI/X file.
+```
+$ swi-signature prepare -h
+usage: swi-signature prepare [-h] [--force-sign] [--outfile OUTFILE]
+                             [--size SIZE]
+                             EOS.swi[x]
+
+positional arguments:
+  EOS.swi[x]         Path of the SWI/X to prepare for signing
+
+optional arguments:
+  -h, --help         show this help message and exit
+  --force-sign       Force signing the SWI/X if it's already signed
+  --outfile OUTFILE  Path to save SWI/X with null signature, if not replacing
+                     the input SWI/X
+  --size SIZE        Size of null signature to add (default 8192 bytes)
+```
+Examples:
+```
+$ swi-signature prepare EOS.swi
+84f6e823976f6d499fb161c2502ba9474b68abca7e98a9c98251ea5bd5e93765
+```
+This adds a null signature of 8192 bytes (the default) to EOS.swi, and prints out its sha256 hash in hex format. Keep track of this hash 
+for use in the next step, as input into a signing server to generate a signature signed by a private key.
+
+```
+$ swi-signature prepare EOS.swi --force-sign --outfile EOS_temp.swi --size 9000
+deleting: swi-signature
+10aa98f4bd283256c8cd922d1bf40fb1b25a13d97049e4c0135e7140cb63d579
+```
+This copies EOS.swi to EOS_temp.swi, and signs EOS_temp.swi with a null signature of 
+9000 bytes, even if it has been signed before (removes the old signature).
+
+Signing SWIX files behaves the same.
+
+### 2. Signing the SWI/X
+After adding a null signature file to the SWI/X, the SWI/X can now be signed. The null signature will be replaced by a real signature
+that contains both the signature of the SWI/X and the signing certificate that will be used to verify the signature. There are two options depending on whether 
+you have direct access to the signing private key.
+```
+$ swi-signature sign -h
+usage: swi-signature sign [-h]
+                          (--signature SIGNATURE.txt | --key SIGNINGKEY.key)
+                          EOS.swi[x] SIGNINGCERT.crt ROOTCERT.crt
+
+positional arguments:
+  EOS.swi[x]            Path of the SWI/X to sign.
+  SIGNINGCERT.crt       Path of signing certificate.
+  ROOTCERT.crt          Root certificate of signing certificate to verify
+                        against 
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --signature SIGNATURE.txt
+                        Path of base64-encoded SHA-256 signature file of EOS.swi or swix, signed by
+                        signing cerificate.
+  --key SIGNINGKEY.key  Path of signing key, used to generate the signature
+```
+
+#### 2a. Signing SWI/X without direct access to private key
+If there is no direct access to the private key, we assume that the private key is stored remotely in some form of signing server. A user should be able to 
+query this signing server to use the signing key to sign an input hash and return the resulting signature.
+The input hash that should be used is printed out in the `swi-signature prepare` step. Since it is given in hex format, the signing server 
+should be able to accept this sha256 hash in hex format as an input. The signing server should then sign the input hash with its signing private key, and then 
+return the resulting signature as well as the signing certificate corresponding to the private key. The resulting signature must be converted to base64 
+format to be used in the `swi-signature sign` script.
+
+Example:
+```
+$ # Prepare EOS.swi for signing and save the hash to input_hash.txt
+$ swi-signature prepare EOS.swi > input_hash.txt                    
+ 
+$ # input_hash.txt is a sha256 hash of EOS.swi in hex format
+$ cat input_hash.txt
+0f1f680a7c97f274cf2b6d131595521fec2a97509aceaddac529b7ab46ef6f8f
+
+$ # Invoke a script that talks to a signing server that takes a hash as input and returns the signing certificate and generated signature.
+$ ./talk-to-signing-server --input input_hash.txt --outputCertFile signing.crt --outputSignatureFile signature.txt 
+
+$ # The resulting signature must be in base64 format
+$ cat signature.txt
+MEYCIQCcpjTgTZm9c+QdlVJ0W6xe7sxhjs7KXbwDngwC3/66QwIhAL7SRpkPOtOSyJPDlEqhyLzziQyght/E1iUSpmvEXmxg
+$
+$ swi-signature sign EOS.swi signing.crt root.crt --signature signature.txt
+SWI file EOS.swi successfully signed and verified.
+
+```
+Signs EOS.swi with a pre-generated signature. At the end of signing, the resulting SWI will be automatically verified with the user-provided root certificate. SWIX signing behaves the same.
+
+#### 2b. Signing SWI/X with direct access to private key
+If there is direct access to the private key, the key can be used directly in the input to the signing script as follows:
+Examples:
+```
+$ swi-signature sign EOS.swi signing.crt root.crt --key signing.key
+SWI file EOS.swi successfully signed and verified.
+```
+Signs EOS.swi using `signing.crt`. The signature used is created by signing the hash of EOS.swi with `signing.key`.
+
+## Verifying an Arista SWI/X signature
+The `verify-swi` script verifies the signature in a SWI or SWIX by checking that the signing certificate
+used to sign the SWI/X is trusted by a specified root certificate, and that signing the SWI/X with the signing certificate matches
+the signature of the SWI/X. By default, the script verifies the signing certificate against the Arista root certificate, which is installed 
+with the package.
+```
+$ verify-swi -h
+usage: verify-swi [-h] [--CAfile CAFILE] EOS.swi[x]
+
+Verify Arista SWI image or SWIX extension
+
+positional arguments:
+  EOS.swi[x]       SWI/X file to verify
+
+optional arguments:
+  -h, --help       show this help message and exit
+  --CAfile CAFILE  Root certificate to verify against. (default:
+                   ARISTA_ROOT_CA.crt)
+```
+Examples:
+```
+$ verify-swi EOS.swi 
+SWI verification failed.
+$ echo $?
+4
+```
+The above example verifies EOS.swi using the Arista root certificate.
+However, the signature is not valid. Invalid signature verification returns a non-zero return code.
+
+```
+$ verify-swi EOS.swi --CAfile root.crt
+SWI verification successful.
+$ echo $?
+0
+```
+Here EOS.swi is verified using `root.crt`. Verification in this case was successful.
+
+## Testing
+To run unit tests:
+``` 
+python setup.py test 
+```

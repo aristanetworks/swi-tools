@@ -12,7 +12,7 @@ import zipfile
 from switools import swisignature
 from switools import verifyswi
 
-import MockSigningServer
+from . import MockSigningServer
 
 SIG_FILE_NAME = 'swix-signature'
 

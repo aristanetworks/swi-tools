@@ -12,7 +12,7 @@ import zipfile
 from switools import verifyswi
 from switools.verifyswi import VERIFY_SWI_RESULT
 
-import MockSigningServer
+from . import MockSigningServer
 
 SIG_FILE_NAME = 'swi-signature'
 
@@ -63,12 +63,12 @@ class TestVerifyBadSignature( unittest.TestCase ):
                            signature=FAKE_SIGNATURE,
                            hashAlgo='SHA-256' ):
         swiSignature = {}
-        swiSignature[ 'IssuerCert' ] = base64.standard_b64encode( signingCert )
+        swiSignature[ 'IssuerCert' ] = base64.standard_b64encode( signingCert.encode() ).decode()
         swiSignature[ 'HashAlgorithm' ] = hashAlgo
         swiSignature[ 'Signature' ] = signature
 
         swiSigStr = ''
-        for key, value in swiSignature.iteritems():
+        for key, value in swiSignature.items():
             swiSigStr += "%s:%s\n" % ( key, value )
         return swiSigStr
 

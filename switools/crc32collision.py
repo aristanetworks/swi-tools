@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
@@ -60,9 +60,9 @@ def main():
    fileToMatch = args.fileToMatch
    fileToChange = args.fileToChange
 
-   with open( fileToMatch, 'r' ) as f:
+   with open( fileToMatch, 'rb' ) as f:
       crcToMatch = crc32( f.read() ) & 0xffffffff
-   with open( fileToChange, 'r' ) as f:
+   with open( fileToChange, 'rb' ) as f:
       crcToChange = crc32( f.read() ) & 0xffffffff
 
    crcBytes = matchingBytes( crcToMatch, crcToChange )

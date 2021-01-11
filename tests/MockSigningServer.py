@@ -122,8 +122,9 @@ N+tWXB01C+UnQziZ6tk5/RcxoHk8kS3lOlvd2D4RTGyJkEI1vmntMGwvmxh8pQ==
 -----END RSA PRIVATE KEY-----"""
 
 def getTestSignature( swiFile ):
-    key = M2Crypto.EVP.load_key_string( MOCK_SIGNING_KEY )
-    key.reset_context( md='sha256' )
-    key.sign_init()
-    key.sign_update( open( swiFile, 'r' ).read() )
-    return base64.b64encode( key.sign_final() )
+    with open( swiFile, 'rb' ) as swi:
+        key = M2Crypto.EVP.load_key_string( MOCK_SIGNING_KEY.encode() )
+        key.reset_context( md='sha256' )
+        key.sign_init()
+        key.sign_update( swi.read() )
+        return base64.b64encode( key.sign_final() ).decode()

@@ -1,19 +1,22 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # Copyright (c) 2018 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
+from __future__ import print_function, absolute_import
+
 import argparse
-import zipfile
-import subprocess
-import shutil
-import hashlib
-from M2Crypto import BIO, EVP
 import base64
-from binascii import crc32
-import crc32collision
-import verifyswi
-import signaturelib
+import binascii
+import hashlib
+import shutil
+import subprocess
+import zipfile
+from M2Crypto import BIO, EVP
+
+from . import crc32collision
+from . import verifyswi
+from . import signaturelib
 
 SIGN_VERSION = 1
 SWI_SIGNATURE_MAX_SIZE = 8192
@@ -51,8 +54,16 @@ class SwiSignature:
                                            self.size - paddingAmt )
          raise SwiSignException( SWI_SIGN_RESULT.ERROR_INPUT_FILES, message )  
       data += "*" * paddingAmt + "\n"
-      data += crcPadding
-      assert len( data ) == self.size
+      data += "CRCPadding:" # we add actual crc padding later since it is in bytes
+      assert len( data ) == self.size - len( self.crcpadding )
+      return data
+
+   def getBytes( self ):
+      data = b''
+      data += self.__repr__().encode()
+      # Add CRC padding
+      for byte in self.crcpadding:
+         data += b'%c' % ( byte & 0xff )
       return data
 
 class SWI_SIGN_RESULT:
@@ -153,20 +164,20 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
       # Check signature is valid base64
       try:
          base64.b64decode( signature )
-      except TypeError:
+      except ( binascii.Error, TypeError ):
          message = 'Error: Signature not in base64.'
          raise SwiSignException( SWI_SIGN_RESULT.ERROR_INPUT_FILES, message )
    elif signingKeyFile:
-      key = EVP.load_key( signingKeyFile )
-      key.reset_context( md='sha256' )
-      key.sign_init()
-      key.sign_update( open( swi, 'r' ).read() )
-      signature = base64.b64encode( key.sign_final() )
+      with open( swi, 'rb' ) as swiFile:
+         key = EVP.load_key( signingKeyFile )
+         key.reset_context( md='sha256' )
+         key.sign_init()
+         key.sign_update( swiFile.read() )
+         signature = base64.b64encode( key.sign_final() ).decode()
    
    # Process signing certificate
-   with open( signingCertFile, 'r' ) as certFile:
-      cert = certFile.read().strip()
-      certificate = base64.standard_b64encode( cert )
+   with open( signingCertFile, 'rb' ) as certFile:
+      certificate = base64.standard_b64encode( certFile.read().strip() ).decode()
 
    # Update signature fields
    offset, fileSize = getNullSigInfo( swi )
@@ -176,16 +187,15 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
    swiSignature.hash = SIGN_HASH
 
    # Update crc padding for swiSignature to match the null signature.
-   # The last 4 bytes of swiSignature is the crc padding of swiSignature.
    data = '\000' * fileSize
-   nullcrc32 = crc32( data ) & 0xffffffff
-   swiSigCrc32 = crc32( str( swiSignature )[ :-4 ] ) & 0xffffffff
+   nullcrc32 = binascii.crc32( data.encode() ) & 0xffffffff
+   swiSigCrc32 = binascii.crc32( str( swiSignature ).encode() ) & 0xffffffff
    swiSignature.crcpadding = crc32collision.matchingBytes( nullcrc32, swiSigCrc32 )
    
    # Rewrite the swi-signature in the right place, replacing the null signature
    with open( swi, 'r+b' ) as outfile:
       outfile.seek( offset )
-      outfile.write( str( swiSignature ) )
+      outfile.write( swiSignature.getBytes() )
 
    # Verify the signature of the SWI
    success = verifyswi.verifySwi( swi, rootCA=rootCaFile )
@@ -241,7 +251,7 @@ def main():
       print( e )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
    except SwiSignException as e:
-      print( e.message )
+      print( e )
       exit( e.code )
   
    exit( SWI_SIGN_RESULT.SUCCESS )

@@ -1,15 +1,19 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
+from __future__ import print_function, absolute_import
+
 import argparse
 import base64
+import binascii
 import os
 from pkg_resources import resource_string
 import zipfile
 from M2Crypto import X509
-import signaturelib
+
+from . import signaturelib
 
 ROOT_CA_FILE_NAME = 'ARISTA_ROOT_CA.crt'
 ROOT_CA = resource_string( __name__, ROOT_CA_FILE_NAME )
@@ -31,7 +35,7 @@ class SwiSignature:
       key2:value2
       etc. """
       for line in sigFile:
-         data = line.split( ':' )
+         data = line.decode( "utf-8", "backslashreplace" ).split( ':' )
          if ( len( data ) == 2 ):
             if data[ 0 ] == 'Version':
                self.version = data[ 1 ].strip()
@@ -102,7 +106,7 @@ def verifySignatureFormat( swiSignature ):
 def base64Decode( text ):
    try:
       return base64.standard_b64decode( text )
-   except TypeError:
+   except ( binascii.Error, TypeError ):
       return ""
 
 def loadSigningCert( swiSignature ):
@@ -147,7 +151,7 @@ def swiSignatureValid( swiFile, swiSignature, signingCertX509 ):
    # Begin reading the data to verify
    pubkey.verify_init()
    # Read the swi file into the verification function, up to the swi signature file
-   with open( swiFile, 'r' ) as swi:
+   with open( swiFile, 'rb' ) as swi:
       while offset < swiSignature.offset:
          if offset + BLOCK_SIZE < swiSignature.offset:
             numBytes = BLOCK_SIZE
@@ -157,7 +161,7 @@ def swiSignatureValid( swiFile, swiSignature, signingCertX509 ):
          offset += numBytes
       # Now that we're at the swi-signature file, read zero's into the verification
       # function up to the size of the swi-signature file.
-      pubkey.verify_update( '\000' * swiSignature.size ) 
+      pubkey.verify_update( b'\000' * swiSignature.size )
 
       # Now jump to the end of the swi-signature file and read the rest of the swi
       # file into the verification function

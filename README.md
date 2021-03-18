@@ -15,6 +15,7 @@ cd swi-tools
 python setup.py install
 ```
 ### Dependencies
+0. Python3. For a version that works with python2, use the version 1.0 release.
 1. [Zip](http://infozip.sourceforge.net/) - Used in the `swi-signature` script to remove a signature from the SWI/X if you want to re-sign it, this comes preinstalled on many operating systems.
 2. [M2Crypto](https://pypi.org/project/M2Crypto/) - installed automatically with the setup script.
 

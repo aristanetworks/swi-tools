@@ -11,6 +11,7 @@ import zipfile
 
 from switools import verifyswi
 from switools.verifyswi import VERIFY_SWI_RESULT
+from swixtools.create import create
 
 from . import MockSigningServer
 
@@ -42,15 +43,20 @@ class TestVerifyBadSignature( unittest.TestCase ):
         self.test_dir = tempfile.mkdtemp()
         self.root_crt = self._writeFile( 'root.crt', 
                                          MockSigningServer.MOCK_ROOT_CERT )
-        self.test_swix = os.path.join( self.test_dir, 'Test.swix' )
-        with zipfile.ZipFile( self.test_swix, 'w' ) as swix:
-            swix.writestr( 'manifest', 'list of rpms' )
+        self.test_swix = self._testPath( 'Test.swix' )
+        self.rpms = [ self._testPath( rpm ) for rpm in [ 'TestA.rpm' ] ]
+        for rpm in self.rpms:
+           self._writeFile( rpm, '' )
+        create( self.test_swix, info=None, rpms=self.rpms, sign=False )
+
+    def _testPath( self, filename ):
+       return os.path.join( self.test_dir, filename )
 
     def tearDown( self ):
         shutil.rmtree( self.test_dir )
 
     def _writeFile( self, filename, contents ):
-        path = os.path.join( self.test_dir, filename )
+        path = self._testPath( filename )
         with open( path, 'w' ) as f:
             f.write( contents )
         return path

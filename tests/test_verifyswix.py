@@ -47,7 +47,7 @@ class TestVerifyBadSignature( unittest.TestCase ):
         self.rpms = [ self._testPath( rpm ) for rpm in [ 'TestA.rpm' ] ]
         for rpm in self.rpms:
            self._writeFile( rpm, '' )
-        create( self.test_swix, info=None, rpms=self.rpms, sign=False )
+        create( self.test_swix, info=None, rpms=self.rpms )
 
     def _testPath( self, filename ):
        return os.path.join( self.test_dir, filename )

@@ -11,6 +11,7 @@ import binascii
 import hashlib
 import shutil
 import subprocess
+import sys
 import zipfile
 from M2Crypto import BIO, EVP
 
@@ -253,6 +254,8 @@ def main():
    except SwiSignException as e:
       print( e )
       exit( e.code )
+   except AttributeError as e: # When main is called with no op.
+      sys.exit( parser.format_help() )
   
    exit( SWI_SIGN_RESULT.SUCCESS )
 

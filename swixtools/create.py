@@ -60,10 +60,10 @@ def createManifest( tempDir, rpms ):
 
    return manifestFileName
 
-def create( outputSwix=None, info=None, rpms=None, force=False, sign=False ):
+def create( outputSwix=None, info=None, rpms=None, force=False ):
    '''
    Create a SWIX file named `outputSwix` given a list of RPMs.
-   `info` and `sign` are currently unused.
+   `info` is currently unused.
    '''
    dealWithExistingOutputFile( outputSwix, force )
    try:
@@ -79,10 +79,6 @@ def create( outputSwix=None, info=None, rpms=None, force=False, sign=False ):
       # '-0' means 'no compression'.
       # '-j' means 'use basenames'.
       subprocess.check_call( f'zip -0 -j {outputSwix}'.split() + filesToZip )
-
-      if sign:
-         pass # TODO: Sign.
-
    except Exception as e:
       sys.exit( f'Error occurred during generation of SWIX file: {e}\n' )
    finally:

@@ -78,7 +78,7 @@ def create( outputSwix=None, info=None, rpms=None, force=False ):
 
       # '-0' means 'no compression'.
       # '-j' means 'use basenames'.
-      subprocess.check_call( f'zip -0 -j {outputSwix}'.split() + filesToZip )
+      subprocess.check_call( [ 'zip', '-0', '-j', outputSwix ] + filesToZip )
    except Exception as e:
       sys.exit( f'Error occurred during generation of SWIX file: {e}\n' )
    finally:

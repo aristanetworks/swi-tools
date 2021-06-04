@@ -113,7 +113,6 @@ def create( outputSwix=None, info=None, rpms=None, force=False ):
    dealWithExistingOutputFile( outputSwix, force )
    try:
       tempDir = tempfile.mkdtemp( suffix='.tempDir',
-                                  dir='.',
                                   prefix=os.path.basename( outputSwix ) )
       manifest = createManifestTxt( tempDir, rpms )
       filesToZip = [ manifest ] + rpms

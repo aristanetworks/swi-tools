@@ -106,7 +106,7 @@ def verifyManifestYaml( filename, rpms ):
    except jsonschema.exceptions.ValidationError as e:
       sys.exit( f'{e}' )
 
-def create( outputSwix=None, info=None, rpms=None, force=False ):
+def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
    '''
    Create a SWIX file named `outputSwix` given a list of RPMs.
    '''
@@ -114,15 +114,15 @@ def create( outputSwix=None, info=None, rpms=None, force=False ):
    try:
       tempDir = tempfile.mkdtemp( suffix='.tempDir',
                                   prefix=os.path.basename( outputSwix ) )
-      manifest = createManifestTxt( tempDir, rpms )
-      filesToZip = [ manifest ] + rpms
+      manifestTxt = createManifestTxt( tempDir, rpms )
+      filesToZip = [ manifestTxt ] + rpms
 
-      if info:
+      if manifestYaml:
          # Copy manifest.yaml to temp dir; does two things:
          # - Ensures file is correctly named,
          # - Fails if file does not exist.
          copy = os.path.join( tempDir, manifestYamlName )
-         shutil.copyfile( info, copy )
+         shutil.copyfile( manifestYaml, copy )
          verifyManifestYaml( copy, rpms )
          filesToZip.append( copy )
 
@@ -144,6 +144,7 @@ def parseCommandArgs( args ):
    add( '-f', '--force', action='store_true',
         help='Overwrite OUTFILE.swix if it already exists' )
    add( '-i', '--info', metavar=manifestYamlName, action='store', type=str,
+        dest='manifestYaml',
         help=f'Location of {manifestYamlName} file to add metadata to SWIX' )
    return parser.parse_args( args )
 

@@ -17,6 +17,8 @@ import sys
 import tempfile
 import yaml
 
+manifestYamlName = 'manifest.yaml'
+
 def dealWithExistingOutputFile( outputSwix, force ):
    '''
    If the desired output file exists, fail unless `force` is specified.
@@ -107,7 +109,6 @@ def verifyManifestYaml( filename, rpms ):
 def create( outputSwix=None, info=None, rpms=None, force=False ):
    '''
    Create a SWIX file named `outputSwix` given a list of RPMs.
-   `info` is currently unused.
    '''
    dealWithExistingOutputFile( outputSwix, force )
    try:
@@ -118,8 +119,13 @@ def create( outputSwix=None, info=None, rpms=None, force=False ):
       filesToZip = [ manifest ] + rpms
 
       if info:
-         verifyManifestYaml( info, rpms )
-         filesToZip.append( info )
+         # Copy manifest.yaml to temp dir; does two things:
+         # - Ensures file is correctly named,
+         # - Fails if file does not exist.
+         copy = os.path.join( tempDir, manifestYamlName )
+         shutil.copyfile( info, copy )
+         verifyManifestYaml( copy, rpms )
+         filesToZip.append( copy )
 
       # '-0' means 'no compression'.
       # '-j' means 'use basenames'.
@@ -135,12 +141,11 @@ def parseCommandArgs( args ):
    add( 'outputSwix', metavar='OUTFILE.swix',
         help='Name of output file' )
    add( 'rpms', metavar='PACKAGE.rpm', type=str, nargs='+',
-        help='An RPM to add to the swix' )
+        help='An RPM to add to the SWIX' )
    add( '-f', '--force', action='store_true',
         help='Overwrite OUTFILE.swix if it already exists' )
-   # TODO: Check what happens if we pass a file by diff name.
-   add( '-i', '--info', metavar='manifest.yaml', action='store', type=str,
-        help='Location of manifest.yaml file to add metadata to swix' )
+   add( '-i', '--info', metavar=manifestYamlName, action='store', type=str,
+        help=f'Location of {manifestYamlName} file to add metadata to SWIX' )
    return parser.parse_args( args )
 
 def main():

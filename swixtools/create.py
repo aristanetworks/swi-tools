@@ -9,11 +9,13 @@ This module is responsible for packaging a SWIX file.
 
 import argparse
 import hashlib
+import jsonschema
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import yaml
 
 def dealWithExistingOutputFile( outputSwix, force ):
    '''
@@ -39,7 +41,7 @@ def sha1sum( filename, blockSize=65536 ):
 
    return result.hexdigest()
 
-def createManifest( tempDir, rpms ):
+def createManifestTxt( tempDir, rpms ):
    '''
    Create a manifest file for the SWIX which contains:
    - The format version.
@@ -60,6 +62,48 @@ def createManifest( tempDir, rpms ):
 
    return manifestFileName
 
+def verifyManifestYaml( filename, rpms ):
+   '''
+   Validate the contents of the manifest.yaml file.
+   Currently, we just validate the structure.
+   '''
+   # TODO: Replace with an actual list.
+   sampleEosVersions = ( '4.26.0.1F',
+                         '4.26.0F',
+                         '4.25.4M',
+                         '4.25.3.1M',
+                         '4.25.3M',
+                         '4.25.2F',
+                         '4.25.1.1F',
+                         '4.25.1F',
+                         '4.25.0F',
+                       )
+   supportedManifestVersions = { 1.0 }
+   try:
+      with open( filename ) as f:
+         manifest = yaml.safe_load( f.read() )
+
+      key = 'metadataVersion'
+      version = manifest[ key ]
+      assert version in supportedManifestVersions
+
+      with open( f'swixtools/schema{version}.json' ) as f:
+         schema = yaml.safe_load( f.read() )
+
+      jsonschema.validate( manifest, schema )
+   except EnvironmentError as e:
+      sys.exit( f'Error opening {filename}: {e}' )
+   except yaml.YAMLError as e:
+      sys.exit( f'Error parsing {filename}: {e}' )
+   except KeyError:
+      sys.exit( f'{key!r} not found in {filename}!' )
+   except AssertionError:
+      supported = ', '.join( str( v ) for v in supportedManifestVersions )
+      sys.exit( f'Manifest version {version!r} is not supported\n'
+                f'Supported versions: {supported}' )
+   except jsonschema.exceptions.ValidationError as e:
+      sys.exit( f'{e}' )
+
 def create( outputSwix=None, info=None, rpms=None, force=False ):
    '''
    Create a SWIX file named `outputSwix` given a list of RPMs.
@@ -70,11 +114,12 @@ def create( outputSwix=None, info=None, rpms=None, force=False ):
       tempDir = tempfile.mkdtemp( suffix='.tempDir',
                                   dir='.',
                                   prefix=os.path.basename( outputSwix ) )
-      manifest = createManifest( tempDir, rpms )
-      filesToZip = [manifest] + rpms
+      manifest = createManifestTxt( tempDir, rpms )
+      filesToZip = [ manifest ] + rpms
 
       if info:
-         pass # TODO: If YAML file, verify.
+         verifyManifestYaml( info, rpms )
+         filesToZip.append( info )
 
       # '-0' means 'no compression'.
       # '-j' means 'use basenames'.
@@ -93,6 +138,7 @@ def parseCommandArgs( args ):
         help='An RPM to add to the swix' )
    add( '-f', '--force', action='store_true',
         help='Overwrite OUTFILE.swix if it already exists' )
+   # TODO: Check what happens if we pass a file by diff name.
    add( '-i', '--info', metavar='manifest.yaml', action='store', type=str,
         help='Location of manifest.yaml file to add metadata to swix' )
    return parser.parse_args( args )

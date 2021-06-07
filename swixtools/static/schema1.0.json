@@ -1,0 +1,76 @@
+{
+   "$schema": "http://json-schema.org/draft-06/schema#",
+   "$ref": "#/definitions/manifest.yaml",
+   "definitions": {
+      "manifest.yaml": {
+         "type": "object",
+         "additionalProperties": false,
+         "properties": {
+            "metadataVersion": {
+               "type": "number"
+            },
+            "installOnBlessedImage": {
+               "type": "boolean"
+            },
+            "version": {
+               "type": "array",
+               "items": {
+                  "$ref": "#/definitions/Version"
+               }
+            },
+            "agentsToRestart": {
+               "type": "array",
+               "items": {
+                  "$ref": "#/definitions/Agent"
+               }
+            }
+         },
+         "required": [
+            "metadataVersion"
+         ],
+         "title": "manifest.yaml"
+      },
+      "Version": {
+         "type": "object",
+         "additionalProperties": {
+            "anyOf" : [
+               {
+                  "$ref" : "#/definitions/Files"
+               }
+            ]
+         },
+         "title": "Version"
+      },
+      "Files": {
+         "type": "array",
+         "additionalProperties": {
+            "anyOf" : [
+               {
+                  "$ref" : "#/definitions/File"
+               },
+               {
+                  "$ref" : "#/definitions/FileWithInstructions"
+               }
+            ]
+         },
+         "title": "Files"
+      },
+      "File": {
+         "type": "string",
+         "title": "File"
+      },
+      "FileWithInstructions": {
+         "type": "object",
+         "properties": {
+            "mount": {
+               "type": "string"
+            }
+         },
+         "title": "FileWithInstructions"
+      },
+      "Agent": {
+         "type": "string",
+         "title": "Agent"
+      }
+   }
+}

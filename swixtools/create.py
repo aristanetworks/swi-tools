@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import yaml
+from pkg_resources import resource_string
 
 manifestYamlName = 'manifest.yaml'
 
@@ -82,10 +83,8 @@ def verifyManifestYaml( filename, rpms ):
       version = manifest[ key ]
       assert version in supportedManifestVersions
 
-      with open( f'swixtools/schema{version}.json' ) as f:
-         schema = yaml.safe_load( f.read() )
-
-      jsonschema.validate( manifest, schema )
+      schema = resource_string( __name__, f'static/schema{version}.json' )
+      jsonschema.validate( manifest, yaml.safe_load( schema ) )
    except EnvironmentError as e:
       sys.exit( f'Error opening {filename}: {e}' )
    except yaml.YAMLError as e:

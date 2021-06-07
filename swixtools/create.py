@@ -8,6 +8,7 @@ This module is responsible for packaging a SWIX file.
 '''
 
 import argparse
+import functools
 import hashlib
 import jsonschema
 import os
@@ -43,7 +44,7 @@ def sha1sum( filename, blockSize=65536 ):
 
    return result.hexdigest()
 
-def createManifestTxt( tempDir, rpms ):
+def createManifestFile( tempDir, rpms ):
    '''
    Create a manifest file for the SWIX which contains:
    - The format version.
@@ -55,10 +56,11 @@ def createManifestTxt( tempDir, rpms ):
    basename = os.path.basename
    try:
       with open( manifestFileName, 'w' ) as manifest:
-         print( 'format: 1', file=manifest )
-         print( f'primaryRpm: {basename( rpms[0] )}', file=manifest )
+         fprint = functools.partial( print, file=manifest )
+         fprint( 'format: 1' )
+         fprint( f'primaryRpm: {basename( rpms[ 0 ] )}' )
          for rpm in rpms:
-            print( f'{basename( rpm )}-sha1: {sha1sum( rpm )}', file=manifest )
+            fprint( f'{basename( rpm )}-sha1: {sha1sum( rpm )}' )
    except Exception as e:
       sys.exit( f'{manifestFileName}: {e}\n' )
 
@@ -69,17 +71,8 @@ def verifyManifestYaml( filename, rpms ):
    Validate the contents of the manifest.yaml file.
    Currently, we just validate the structure.
    '''
-   # TODO: Replace with an actual list.
-   sampleEosVersions = ( '4.26.0.1F',
-                         '4.26.0F',
-                         '4.25.4M',
-                         '4.25.3.1M',
-                         '4.25.3M',
-                         '4.25.2F',
-                         '4.25.1.1F',
-                         '4.25.1F',
-                         '4.25.0F',
-                       )
+   # TODO: Validate EOS version strings against a list of EOS versions.
+   # TODO: Print version/compatible RPMs table.
    supportedManifestVersions = { 1.0 }
    try:
       with open( filename ) as f:
@@ -114,8 +107,8 @@ def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
    try:
       tempDir = tempfile.mkdtemp( suffix='.tempDir',
                                   prefix=os.path.basename( outputSwix ) )
-      manifestTxt = createManifestTxt( tempDir, rpms )
-      filesToZip = [ manifestTxt ] + rpms
+      manifestFilename = createManifestFile( tempDir, rpms )
+      filesToZip = [ manifestFilename ] + rpms
 
       if manifestYaml:
          # Copy manifest.yaml to temp dir; does two things:

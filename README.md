@@ -6,7 +6,10 @@ A SWIX is a SoftWare Image eXtension, a collection of files (ex RPMs, squashfs) 
 
 ## Scripts
 * **swi-signature**: Add a cryptographic signature to an Arista SWI or SWIX
+* **swix-signature**: A convenience alias for the above
 * **verify-swi**: Verify the cryptographic signature of an Arista SWI or SWIX
+* **verify-swix**: A convenience alias for the above
+* **swix-create**: Create a new SWIX file
 
 ## Installation
 ```
@@ -18,7 +21,61 @@ python3 setup.py install
 0. Python3. For a version that works with python2, use the version 1.0 release.
 1. [Zip](http://infozip.sourceforge.net/) - Used in the `swi-signature` script to remove a signature from the SWI/X if you want to re-sign it, this comes preinstalled on many operating systems.
 2. [M2Crypto](https://pypi.org/project/M2Crypto/) - installed automatically with the setup script.
+3. [PyYAML](https://pyyaml.org) - Used to read the manifest.yaml, if added, when creating a SWIX.
+4. [jsonschema](http://json-schema.org) - Used to verify the manifest.yaml, if added, when creating a SWIX.
 
+## Creating a SWIX
+Creating a SWIX is a straightforward process involving the `swix-create` command.
+```
+$ swix-create -h
+usage: swix-create [-h] [-f] [-i manifest.yaml]
+                   OUTFILE.swix PACKAGE.rpm [PACKAGE.rpm ...]
+
+positional arguments:
+  OUTFILE.swix          Name of output file
+  PACKAGE.rpm           An RPM to add to the SWIX
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f, --force           Overwrite OUTFILE.swix if it already exists
+  -i manifest.yaml, --info manifest.yaml
+                        Location of manifest.yaml file to add metadata to SWIX
+```
+### 1. Creating a simple SWIX
+```
+$ swix-create MySwix.swix MyRpm.rpm
+  adding: manifest.txt (stored 0%)
+  adding: MyRpm.rpm (stored 0%)
+```
+Your SWIX is ready to be installed on a switch!
+```
+(Arista)# scp user@host:/path/MySwix.swix extension:
+Copy completed successfully.
+(Arista)# show extensions
+Name             Version/Release      Status      Extension
+---------------- -------------------- ----------- ---------
+MySwix.swix      1.0.3/1.el7          A, NI       1
+(Arista)# extension MySwix.swix
+<<< output
+```
+Et voilà! Your extension has been installed. Note that your extension may require some agents to be restarted. e.g., A restart of ConfigAgent is required if any CLI plugins have been added.
+### 2. Structure of the manifest.yaml file
+The functionality of the SWIX can be enriched by adding a YAML file which contains instructions on when and how to install certain files. Such file is added with the `-i` switch, followed by the file, which will get validated and added to the SWIX. A sample manifest.yaml
+```
+metadataVersion: 1.0
+version:
+  - 4.21.1*:
+    - AppBeta.rpm
+    - AppBeta.squashfs:
+      - mount: /opt/apps/hello_world
+  - 4.20.{6-9}*:
+    - AppStable.rpm
+    - AppStable.squashfs:
+      - mount: /opt/apps/hello_world
+```
+The first indented entry reads as:
+* For EOS versions 4.21.1, 4.21.1.1, 4.21.1FX, etc., but not 4.21.10, install `AppBeta.rpm` and mount the SquashFS file `AppBeta.squashfs` at `/opt/apps/hello_world`.
+When installing a SWIX with the above manifest on a switch, EOS would match its 
 ## Signing an Arista SWI/X
 Signing an Arista SWI or SWIX is a multi-step process involving the `swi-signature` script. First, with `swi-signature prepare`,
 a null signature file (a fix-sized signature file made entirely of null bytes) is added to the SWI/X, at the path `/swi-signature` (for SWI files) or `/swix-signature` (for SWIX files) in the zip file. 

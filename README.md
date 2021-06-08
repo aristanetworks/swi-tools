@@ -56,26 +56,35 @@ Name             Version/Release      Status      Extension
 ---------------- -------------------- ----------- ---------
 MySwix.swix      1.0.3/1.el7          A, NI       1
 (Arista)# extension MySwix.swix
-<<< output
+Note: no agents to restart
 ```
 Et voilà! Your extension has been installed. Note that your extension may require some agents to be restarted. e.g., A restart of ConfigAgent is required if any CLI plugins have been added.
-### 2. Structure of the manifest.yaml file
+### 2. Adding a manifest.yaml file
 The functionality of the SWIX can be enriched by adding a YAML file which contains instructions on when and how to install certain files. Such file is added with the `-i` switch, followed by the file, which will get validated and added to the SWIX. A sample manifest.yaml
 ```
 metadataVersion: 1.0
 version:
   - 4.21.1*:
     - AppBeta.rpm
+    - AppBeta-lib.rpm
     - AppBeta.squashfs:
       - mount: /opt/apps/hello_world
   - 4.20.{6-9}*:
     - AppStable.rpm
     - AppStable.squashfs:
       - mount: /opt/apps/hello_world
+agentsToRestart:
+  - ConfigAgent
+  - IgmpSnoopingAgent
 ```
-The first indented entry reads as:
-* For EOS versions 4.21.1, 4.21.1.1, 4.21.1FX, etc., but not 4.21.10, install `AppBeta.rpm` and mount the SquashFS file `AppBeta.squashfs` at `/opt/apps/hello_world`.
-When installing a SWIX with the above manifest on a switch, EOS would match its 
+At the moment, the only supported metadata version is `1.0`. The other entry is the version-specific instructions for the extension. The first indented entry reads as:
+* For EOS versions 4.25.1 (Also 4.25.1.1, 4.25.1FX, etc., but not 4.25.10)
+  * Install `AppBeta.rpm`
+  * Install `AppBeta-lib.rpm`
+  * Mount the SquashFS file `AppBeta.squashfs` on `/opt/apps/hello_world`
+  * Prompt the user that `ConfigAgent` and `IgmpSnoopingAgent` need to be restarted. This only works on EOS versions 4.25.1 and later.
+
+This way, you can publish one SWIX that works on multiple versions of EOS.
 ## Signing an Arista SWI/X
 Signing an Arista SWI or SWIX is a multi-step process involving the `swi-signature` script. First, with `swi-signature prepare`,
 a null signature file (a fix-sized signature file made entirely of null bytes) is added to the SWI/X, at the path `/swi-signature` (for SWI files) or `/swix-signature` (for SWIX files) in the zip file. 

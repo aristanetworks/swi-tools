@@ -2,16 +2,17 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-import unittest
 import base64
 import os
+import pyparsing
 import shutil
 import tempfile
+import unittest
 import zipfile
 
 from switools import verifyswi
 from switools.verifyswi import VERIFY_SWI_RESULT
-from swixtools.create import create
+from swixtools.create import create, validatorFuncs
 
 from . import MockSigningServer
 
@@ -41,7 +42,7 @@ FAKE_SIGNATURE = "MEUCIQCK5BtHiuFn+hoV8GnIICc60AUi1rgKtOtrguIUz4g5/gIgHXT5beCabs
 class TestVerifyBadSignature( unittest.TestCase ):
     def setUp( self ):
         self.test_dir = tempfile.mkdtemp()
-        self.root_crt = self._writeFile( 'root.crt', 
+        self.root_crt = self._writeFile( 'root.crt',
                                          MockSigningServer.MOCK_ROOT_CERT )
         self.test_swix = self._testPath( 'Test.swix' )
         self.rpms = [ self._testPath( rpm ) for rpm in [ 'TestA.rpm' ] ]
@@ -132,7 +133,81 @@ class TestVerifyBadSignature( unittest.TestCase ):
         sig = self._makeSwixSignature()
         self._addSigToSwix( sig )
         retCode = verifyswi.verifySwi( self.test_swix )
-        self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH ) 
+        self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH )
+
+class TestVersionStringValidator( unittest.TestCase ):
+   def testGood( self ):
+      manifestVersions = {
+         1.0: (
+            '4.22.3',
+            '4.22.3*',
+            '4.14.5FX*',
+            '4.14.5.1*',
+            '4.19*',
+            '4.22.{3-12}',
+            '4.{22-23}.1',
+            '4.22.{3-$}',
+            '4.{19-21}.{3-5}*',
+            '4.22.{3-12}*',
+            '4.22.3, 4.21.3*, 4.20.{3-12}*',
+            '4.22.{3-$}*, 4.23.{2-3}*',
+         ),
+      }
+
+      for mv in manifestVersions:
+         validatorFunc = validatorFuncs[ mv ]
+         versionStrings = manifestVersions[ mv ]
+         for v in versionStrings:
+            validatorFunc( [ v ] )
+
+   def testBad( self ):
+      manifestVersions = {
+         1.0: (
+            '',
+            ' , ', # Only comma.
+            ' , 4.22.3', # Comma prefix.
+            '4.22.3,', # Trailing comma.
+            'RTJ', # Not a version.
+            '4.22.1+', # '+' is not a thing.
+            '4.22.1; cat /etc/passwd', # Bobby Tables?
+            '4..1', # '..' is not a thing.
+            '4.{22-23.1', # Missing closing brace.
+            '4.{2223}.1', # Not a range.
+            '4.22.{1-3}F{4-7}', # Missing dot, letters aren't last.
+            '}', # Just a curly brace.
+            '4.22.1{1-3}3}', # Extra closing brace.
+            '4.22.1{2}*', # Not a range.
+            '4.22.1{{4-5}', # Extra open brace.
+            '4.22.1{4--5}', # Extra dash in range.
+            '4.22.1{2B-4}', # Bad lower bound for range.
+            '4.22.1{1-9S}', # Bad upper bound for range.
+            '4.22.1{4-2}', # Mixing number and range.
+            '4.2{-5}.1', # Missing lower bound for range.
+            '4.2{1-}.1', # Missing upper bound for range.
+            '4.2{-}.5', # Missing bounds for range.
+            '*', # Star used for major version.
+            '4.2*.3*', # A fault in our stars.
+         ),
+      }
+      for mv in manifestVersions:
+         validatorFunc = validatorFuncs[ mv ]
+         versionStrings = manifestVersions[ mv ]
+         for v in versionStrings:
+            with self.assertRaises( pyparsing.ParseException ):
+               validatorFunc( [ v ] )
+
+   def testUgly( self ):
+      manifestVersions = {
+         1.0: (
+            ' 4  .   2  2 .3',
+         ),
+      }
+      for mv in manifestVersions:
+         validatorFunc = validatorFuncs[ mv ]
+         versionStrings = manifestVersions[ mv ]
+         for v in versionStrings:
+            with self.assertRaises( pyparsing.ParseException ):
+               validatorFunc( [ v ] )
 
 if __name__ == '__main__':
     unittest.main()

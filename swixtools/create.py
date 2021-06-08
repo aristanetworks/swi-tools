@@ -12,6 +12,7 @@ import functools
 import hashlib
 import jsonschema
 import os
+import pyparsing
 import shutil
 import subprocess
 import sys
@@ -67,12 +68,48 @@ def createManifestFile( tempDir, rpms ):
 
    return manifestFileName
 
+def validateVersions1_0( versionStrings ):
+   '''
+   Validate version strings like "4.3.21"
+   '''
+   number = pyparsing.Word( pyparsing.nums )
+   # End of a range can be a number or '$', meaning 'latest version'.
+   endRange = number ^ '$'
+   # A range of versions: '{1-5}', '{7-$}', etc.
+   numRange = '{' + number + '-' + endRange + '}'
+   # Non-major versions: the part after the '.' in '4.10', '4.{21-23}', etc.
+   numOrRange = number ^ numRange
+   # Start with a major version like '4'.
+   version = number
+   # Then maybe non-major versions, each as a number or range.
+   version += pyparsing.ZeroOrMore( '.' + numOrRange )
+   # Then letters like 'FX'.
+   version += pyparsing.Optional( pyparsing.Word( pyparsing.alphas ) )
+   # Star means 'anything' and can only be used in the end.
+   version += pyparsing.Optional( '*' )
+   # A string could be two versions, separated by a comma.
+   versionString = version + pyparsing.ZeroOrMore( ',' + version )
+
+   for v in versionStrings:
+      try:
+         versionString.parseString( v, parseAll=True )
+      except pyparsing.ParseException as e:
+         # Error doesn't include string, so repackage it.
+         raise pyparsing.ParseException( f'Unable to parse {v!r}\n{e}' )
+
+validatorFuncs = {
+   # Caveat: `1` and `1.0` map the same.
+   1.0: validateVersions1_0,
+}
+
+def validateVersions( version, versionStrings ):
+   return validatorFuncs[ version ]( versionStrings )
+
 def verifyManifestYaml( filename, rpms ):
    '''
    Validate the contents of the manifest.yaml file.
    Currently, we just validate the structure.
    '''
-   # TODO: Validate EOS version strings against a list of EOS versions.
    # TODO: Print version/compatible RPMs table.
    supportedManifestVersions = { 1.0 }
    try:
@@ -85,6 +122,9 @@ def verifyManifestYaml( filename, rpms ):
 
       schema = resource_string( __name__, f'static/schema{version}.json' )
       jsonschema.validate( manifest, yaml.safe_load( schema ) )
+      versionStrings = manifest.get( 'version' )
+      if versionStrings:
+         validateVersions( version, ( list( v )[ 0 ] for v in versionStrings ) )
    except EnvironmentError as e:
       sys.exit( f'Error opening {filename}: {e}' )
    except yaml.YAMLError as e:
@@ -96,7 +136,9 @@ def verifyManifestYaml( filename, rpms ):
       sys.exit( f'Manifest version {version!r} is not supported\n'
                 f'Supported versions: {supported}' )
    except jsonschema.exceptions.ValidationError as e:
-      sys.exit( f'{e}' )
+      sys.exit( f'Manifest validation error: {e}' )
+   except pyparsing.ParseException as e:
+      sys.exit( f'Version strings validation error: {e}' )
 
 def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
    '''

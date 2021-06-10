@@ -70,29 +70,36 @@ def createManifestFile( tempDir, rpms ):
 
 def validateVersions1_0( versionStrings ):
    '''
-   Validate version strings like "4.3.21"
+   Validate EOS version strings like "4.3.21".
+   Other valid strings: '4.22.3*', '4.14.5FX*',
+                        '4.14.5.1*', '4.19*',
+                        '4.22.{3-12}', '4.{22-23}.1',
+                        '4.22.{3-$}', '4.{19-21}.{3-5}*',
+                        '4.22.{3-12}*', '4.22.3, 4.21.3*, 4.20.{3-12}*'
    '''
+   # Define individual parts of the syntax. A number is consecutive digits.
    number = pyparsing.Word( pyparsing.nums )
-   # End of a range can be a number or '$', meaning 'latest version'.
-   endRange = number ^ '$'
-   # A range of versions: '{1-5}', '{7-$}', etc.
-   numRange = '{' + number + '-' + endRange + '}'
-   # Non-major versions: the part after the '.' in '4.10', '4.{21-23}', etc.
-   numOrRange = number ^ numRange
-   # Start with a major version like '4'.
-   version = number
-   # Then maybe non-major versions, each as a number or range.
-   version += pyparsing.ZeroOrMore( '.' + numOrRange )
+   # End of a number range can be a number or '$', meaning 'latest version'.
+   rangeEnd = number ^ '$'
+   # A range of numbers: '{1-5}', '{7-$}', etc.
+   numRange = '{' + number + '-' + rangeEnd + '}'
+   # Minor and patch are a number or a range.
+   minor = number ^ numRange
+
+   # Define the syntax: Start with a major version like '4'.
+   singleVersionSyntax = number
+   # Then '.' and maybe minor and patch, each as a number or range.
+   singleVersionSyntax += pyparsing.ZeroOrMore( '.' + minor )
    # Then letters like 'FX'.
-   version += pyparsing.Optional( pyparsing.Word( pyparsing.alphas ) )
+   singleVersionSyntax += pyparsing.Optional( pyparsing.Word( pyparsing.alphas ) )
    # Star means 'anything' and can only be used in the end.
-   version += pyparsing.Optional( '*' )
-   # A string could be two versions, separated by a comma.
-   versionString = version + pyparsing.ZeroOrMore( ',' + version )
+   singleVersionSyntax += pyparsing.Optional( '*' )
+   # A version string could be several versions, separated by a comma.
+   syntax = singleVersionSyntax + pyparsing.ZeroOrMore( ',' + singleVersionSyntax )
 
    for v in versionStrings:
       try:
-         versionString.parseString( v, parseAll=True )
+         syntax.parseString( v, parseAll=True )
       except pyparsing.ParseException as e:
          # Error doesn't include string, so repackage it.
          raise pyparsing.ParseException( f'Unable to parse {v!r}\n{e}' )

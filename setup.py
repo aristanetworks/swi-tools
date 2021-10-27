@@ -5,7 +5,7 @@
 from setuptools import setup
 
 setup( name='switools',
-       version='1.0',
+       version='1.1',
        description='Tools for handling Arista SWI/X',
        packages=['switools', 'swixtools'],
        install_requires=[ 'jsonschema', 'pyparsing', 'PyYAML', 'M2Crypto' ],

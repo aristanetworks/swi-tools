@@ -13,6 +13,10 @@ A SWIX is a SoftWare Image eXtension, a collection of files (ex RPMs, squashfs) 
 
 ## Installation
 ```
+pip3 install switools
+```
+Alternatively:
+```
 git clone https://github.com/aristanetworks/swi-tools.git
 cd swi-tools
 python3 setup.py install

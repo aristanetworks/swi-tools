@@ -4,9 +4,14 @@
 
 from setuptools import setup
 
+with open('README.md') as f:
+    long_description = f.read()
+
 setup( name='switools',
        version='1.1',
        description='Tools for handling Arista SWI/X',
+       long_description=long_description,
+       long_description_content_type='text/markdown',
        packages=['switools', 'swixtools'],
        install_requires=[ 'jsonschema', 'pyparsing', 'PyYAML', 'M2Crypto' ],
        test_suite="tests",

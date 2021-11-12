@@ -10,6 +10,7 @@ import base64
 import binascii
 import os
 from pkg_resources import resource_string
+import shutil
 import zipfile
 from M2Crypto import X509
 
@@ -45,11 +46,16 @@ class SwiSignature:
                self.cert = base64Decode( data[ 1 ].strip() )
             elif data[ 0 ] == 'Signature':
                self.signature = base64Decode( data [ 1 ].strip() )
+            elif data[ 0 ] == 'CRCPadding': # last entry
+               # has binary content that sometimes contains \n, so break before err
+               break
          else:
-            print( 'Unexpected format for line in swi[x]-signature file: %s' % line )
+            if not data[ 0 ] == 'CRCPadding': # padding value is binary, may have :
+               print( 'Unexpected format for line in swi[x]-signature file: %s' % line )
 
 class VERIFY_SWI_RESULT:
    SUCCESS = 0
+   ERROR = -1
    ERROR_SIGNATURE_FILE = 3
    ERROR_VERIFICATION = 4
    ERROR_HASH_ALGORITHM = 5
@@ -59,7 +65,7 @@ class VERIFY_SWI_RESULT:
    ERROR_INVALID_SIGNING_CERT = 9
    ERROR_INVALID_ROOT_CERT = 10
 
-VERIFY_SWI_MESSAGE = { 
+VERIFY_SWI_MESSAGE = {
    VERIFY_SWI_RESULT.SUCCESS: "SWI/X verification successful.",
    VERIFY_SWI_RESULT.ERROR_SIGNATURE_FILE: "SWI/X is not signed." ,
    VERIFY_SWI_RESULT.ERROR_VERIFICATION: "SWI/X verification failed.",
@@ -99,7 +105,7 @@ def getSwiSignatureData( swiFile ):
 
 def verifySignatureFormat( swiSignature ):
    # Check that the signing cert, hash algorithm, and signatures are valid
-   return ( len( swiSignature.cert ) != 0 and 
+   return ( len( swiSignature.cert ) != 0 and
             len( swiSignature.hashAlgo ) != 0 and
             len( swiSignature.signature ) != 0 )
 
@@ -130,7 +136,7 @@ def signingCertValid( signingCertX509, rootCAFile ):
       return VERIFY_SWI_RESULT.SUCCESS
    else:
       return VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH
-      
+
 def getHashAlgo( swiSignature ):
    hashAlgo = swiSignature.hashAlgo
    # For now, we always use SHA-256
@@ -201,20 +207,55 @@ def verifySwi( swi, rootCA=ROOT_CA_FILE_NAME ):
    except X509CertException as e:
       return e.code
 
+def verifyAllSwi( swi, rootCA=ROOT_CA_FILE_NAME ):
+   # We will extract sub-images to /tmp to verify their signatures
+   workDir = "/tmp/verify-optims-%d" % os.getpid()
+   os.mkdir( workDir )
+   finalRetCode = VERIFY_SWI_RESULT.SUCCESS
+
+   try:
+      # Make sure the image we got is a swi file
+      if ( not os.path.isfile( swi ) or
+           os.system( "set -e; image=$(readlink -f %s); cd %s;"
+                      "unzip -o -q $image version" % ( swi, workDir ) ) ):
+         return VERIFY_SWI_RESULT.ERROR_NOT_A_SWI
+      optims = signaturelib.getOptimizations( swi, workDir )
+      # If image has multiple sub-images, verify each
+      if not ( optims is None or len( optims ) == 1 ):
+         print( "Optimizations in %s: %s" % ( swi, " ".join( optims ) ) )
+         signaturelib.extractSwadapt( swi, workDir )
+         for optim in optims:
+            optimImage = "%s/%s.swi" % ( workDir, optim )
+            # extract sub-image
+            os.system("%s/swadapt %s %s %s" % ( workDir, swi, optimImage, optim ) )
+            retCode = verifySwi( optimImage, rootCA )
+            os.remove( optimImage )
+            print( "%s: %s" % ( optim, VERIFY_SWI_MESSAGE[ retCode ] ) )
+            if retCode != VERIFY_SWI_RESULT.SUCCESS:
+               finalRetCode = VERIFY_SWI_RESULT.ERROR
+      # Finally check the container image (or legacy "one level" image)
+      retCode = verifySwi( swi, rootCA )
+      print( VERIFY_SWI_MESSAGE[ retCode ] )
+   finally:
+      shutil.rmtree( workDir )
+
+   return finalRetCode
+
 def main():
    helpText = "Verify Arista SWI image or SWIX extension"
-   parser = argparse.ArgumentParser( description=helpText, 
+   parser = argparse.ArgumentParser( description=helpText,
                formatter_class=argparse.ArgumentDefaultsHelpFormatter )
    parser.add_argument( "swi_file", metavar="EOS.swi[x]", help="SWI/X file to verify" )
    parser.add_argument( "--CAfile", default=ROOT_CA_FILE_NAME,
                         help="Root certificate to verify against." )
-                        
+
    args = parser.parse_args()
    swi = args.swi_file
    rootCA = args.CAfile
 
-   retCode = verifySwi( swi, rootCA )
-   print( VERIFY_SWI_MESSAGE[ retCode ] )
+   # swi images in swi format 3.0 can contain multiple sub-images that each have
+   # their own signature.
+   retCode = verifyAllSwi( swi, rootCA )
    exit( retCode )
 
 if __name__ == "__main__":

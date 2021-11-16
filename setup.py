@@ -21,6 +21,7 @@ setup( name='switools',
                                 'swix-create=swixtools.create:main',
                                 'swix-signature=switools.swisignature:main',
                                 'verify-swix=switools.verifyswi:main',
+                                'swi-signing-service=switools.swisigningservice:main'
                               ],
        },
        url='https://github.com/aristanetworks/swi-tools',

@@ -211,7 +211,7 @@ def signSwiAll( swi, signingCertFile, rootCaFile, signatureFile=None, signingKey
 
    try:
       optims = signaturelib.getOptimizations( swi, workDir )
-      if optims is None or len( optims ) == 1:
+      if optims is None or len( optims ) == 1 or "DEFAULT" in optims:
          # legacy case of a single rootfs image
          # maybe need to use a remote signing service (new feature in v1.2)
          if not signatureFile and not signingKeyFile:
@@ -265,7 +265,7 @@ def signSwiAll( swi, signingCertFile, rootCaFile, signatureFile=None, signingKey
 
       # And now sign the mother of all images
       sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
-      print( "Container sha256: %s" % sha256 )
+      print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
       if not signingKeyFile: # need to use a remote signing service
          signatureFile = "%s/sig" % workDir
          ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )

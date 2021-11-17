@@ -221,7 +221,7 @@ def verifyAllSwi( swi, rootCA=ROOT_CA_FILE_NAME ):
          return VERIFY_SWI_RESULT.ERROR_NOT_A_SWI
       optims = signaturelib.getOptimizations( swi, workDir )
       # If image has multiple sub-images, verify each
-      if not ( optims is None or len( optims ) == 1 ):
+      if not ( optims is None or len( optims ) == 1 or "DEFAULT" in optims ):
          print( "Optimizations in %s: %s" % ( swi, " ".join( optims ) ) )
          signaturelib.extractSwadapt( swi, workDir )
          for optim in optims:

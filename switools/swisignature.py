@@ -75,6 +75,8 @@ class SWI_SIGN_RESULT:
    ERROR_NO_NULL_SIG = 3
    ERROR_NOT_A_SWI = 4
    ERROR_INPUT_FILES = 5
+   ERROR_SIGNING_SERVER_FAILED = 6
+   ERROR_NO_SIGNATURE_FILE_PROVIDED = 7
 
 class SwiSignException( Exception ):
    def __init__( self, code, message ):
@@ -179,6 +181,20 @@ def extractSignature( swi, destFile, sigFileName=None ):
       print( "Error: Cannot extract signature file %s from  %s" % ( sigFn, swi ) )
       sys.exit( SWI_SIGN_RESULT.CANNOT_EXTRACT_SIGNATURE )
 
+def getSignatureFile( swi, signatureFile ):
+   serviceName = 'swi-signing-service'
+   serviceBinary = shutil.which( serviceName )
+   if not serviceBinary:
+      print( "Error: signing service '%s' not found" % serviceName )
+      sys.exit( SWI_SIGN_RESULT.ERROR_SIGNING_SERVER_FAILED )
+
+   sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
+   print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
+   ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
+   if ret != 0:
+      print( "Error: signing-server '%s' failed" % serviceBinary )
+      sys.exit( SWI_SIGN_RESULT.ERROR_SIGNING_SERVER_FAILED )
+
 def signSwiAll( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFile=None ):
    # Sub-images ("optimizations") are extracted to /tmp. The utility 'swadapt' is
    # handling that extraction. swadapt is found inside the image itself and is a
@@ -199,12 +215,17 @@ def signSwiAll( swi, signingCertFile, rootCaFile, signatureFile=None, signingKey
          # legacy case of a single rootfs image
          # maybe need to use a remote signing service (new feature in v1.2)
          if not signatureFile and not signingKeyFile:
-            sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
             signatureFile = "%s/sig" % workDir
-            ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
-            if ret != 0:
-               print( "Error: signing-server failed for %s" % image )
-               sys.exit( -1 )
+            getSignatureFile( swi, signatureFile ) # never returns in case of fail
+         if not signatureFile and not signingKeyFile:
+            print ( 'Error: without signing key we need a signature file: '
+                    'run "swi-signature prepare" first and have the digest it prints '
+                    'signed and passed to this command.' )
+            sys.exit( SWI_SIGN_RESULT.ERROR_NO_SIGNATURE_FILE_PROVIDED )
+         if not signatureFile and signingKeyFile:
+            sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
+            print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
+         # insert the signatureFile into the swi, or use the signing key to create the signatureFile first
          return signSwi( swi, signingCertFile, rootCaFile,
                          signatureFile=signatureFile, signingKeyFile=signingKeyFile )
 
@@ -215,15 +236,13 @@ def signSwiAll( swi, signingCertFile, rootCaFile, signatureFile=None, signingKey
          optimImage = "%s/%s.swi" % ( workDir, optim )
          # Adapt swi (extract an optimized image)
          os.system("%s/swadapt %s %s %s" % ( workDir, swi, optimImage, optim ) )
-         # Sign optimized swi
-         sha256 = prepareSwi( swi=optimImage, outfile=None, forceSign=True )
-         print( "%s sha256: %s" % ( optim, sha256 ) )
          if not signingKeyFile: # need to use a remote signing service
             signatureFile = "%s/sig" % workDir
-            ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
-            if ret != 0:
-               print( "Error: signing-server failed for %s" % image )
-               sys.exit( -1 )
+            getSignatureFile( optimImage, signatureFile ) # never returns in case of fail
+         else:
+            sha256 = prepareSwi( swi=optimImage, outfile=None, forceSign=True )
+            print( "%s sha256: %s" % ( optim, sha256 ) )
+         # Sign optimized swi using provided key or provided full fledged signature file
          signSwi( optimImage, signingCertFile, rootCaFile,
                   signatureFile=signatureFile, signingKeyFile=signingKeyFile )
 

@@ -34,7 +34,7 @@ def main():
    # convert it to base64 encoding
    
    digest = int( "%s%s%s" % ( padSha256k4096, sha256Magic, digest ), 16 )
-   workDir = "/tmp/swi-signing-server-%d" % os.getpid()
+   workDir = "/tmp/swi-signing-service-%d" % os.getpid()
    os.system( "mkdir %s" % workDir )
    os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | sed -n '/modulus:/,/^[^ ]/p' | sed '1d' | sed '$d' | sed 's/ //g' | sed 's/://g' | tr -d '\n' > %s/m" % workDir )
    os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | sed -n '/privateExponent:/,/^[^ ]/p' | sed '1d' | sed '$d' | sed 's/ //g' | sed 's/://g' | tr -d '\n' > %s/e" % workDir )

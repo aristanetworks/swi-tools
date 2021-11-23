@@ -10,7 +10,7 @@ A SWIX is a SoftWare Image eXtension, a collection of files (ex RPMs, squashfs) 
 * **verify-swi**: Verify the cryptographic signature of an Arista SWI or SWIX
 * **verify-swix**: A convenience alias for the above
 * **swix-create**: Create a new SWIX file
-* **swi-signing-server**: Simple example of a signing server (all local)
+* **swi-signing-service**: Simple example of a signing service (all local)
 
 ## Installation
 ```

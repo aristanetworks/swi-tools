@@ -10,6 +10,7 @@ import argparse
 import base64
 import binascii
 import hashlib
+import tempfile
 import shutil
 import subprocess
 import sys
@@ -75,8 +76,12 @@ class SWI_SIGN_RESULT:
    ERROR_NO_NULL_SIG = 3
    ERROR_NOT_A_SWI = 4
    ERROR_INPUT_FILES = 5
-   ERROR_SIGNING_SERVER_FAILED = 6
-   ERROR_NO_SIGNATURE_FILE_PROVIDED = 7
+   ERROR_NO_SIGNATURE_FILE_PROVIDED = 6
+   ERROR_NO_SIGNING_SERVICE = 7
+   ERROR_SIGNING_SERVICE_FAILED = 8
+   ERROR_SIGNATURE_INSERTION_FAILED = 9
+   ERROR_SIGNATURE_EXTRACTION_FAILED = 10
+   INTERNAL_ERROR = 11
 
 class SwiSignException( Exception ):
    def __init__( self, code, message ):
@@ -137,18 +142,12 @@ def prepareSwi( swi, outfile=None, forceSign=False, size=SWI_SIGNATURE_MAX_SIZE 
    # re-inserted with zip (without changing the version-required-to-extract meta
    # file info (zipFile has 2.0, zip has 1.0) and thus corrupting the signature)
    data = '\000' * size
-   tmpDir = "/tmp/swi-nullsig-%d" % os.getpid()
-   os.mkdir( tmpDir )
-   try:
+   with tempfile.TemporaryDirectory( prefix="swi-nullsig-" ) as tmpDir:
       sigFileName = signaturelib.getSigFileName( swiFile )
       f = open( "%s/%s" % ( tmpDir, sigFileName ), "w" )
       f.write( data )
       f.close()
-      ret = os.system( "set -e; src=$(readlink -f %s); cd %s; "
-                       "zip -q -0 -X $src %s" % ( swiFile, tmpDir, sigFileName ) )
-   finally:
-      shutil.rmtree( tmpDir )
-   assert ret == 0, "Cannot add Null signature to %s" % swiFile
+      insertSignature( swiFile, sigFileName, tmpDir )
 
    # Return SHA-256 hash of null SWI
    nullSwiHash = generateHash( swiFile, 'SHA-256' )
@@ -160,122 +159,121 @@ def signSwiHandler( args ):
    rootCaFile = args.CAfile
    signatureFile = args.signature
    signingKeyFile = args.key
-   signSwiAll( swi, signingCertFile, rootCaFile, signatureFile, signingKeyFile )
-   print( 'SWI/X file %s successfully signed and verified.' % swi )
+   with tempfile.TemporaryDirectory( prefix="swi-signature-" ) as workDir:
+      signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile, signingKeyFile )
+      print( 'SWI/X file %s successfully signed and verified.' % swi )
 
-def extractSignature( swi, destFile, sigFileName=None ):
-   sigFn = sigFileName
-   if not sigFn:
-      sigFn = signaturelib.SWI_SIG_FILE_NAME
-   ret = os.system( "set -e;"
-                    "destDir=$(readlink -f $(dirname %s));"
-                    "destFile=$(basename %s);"
-                    "swi=$(readlink -f %s);"
-                    "sigFile=%s;"
-                    "cd $destDir;"
-                    "unzip -o -q $swi $sigFile;"
-                    "mv $sigFile $destFile" % (
-                      destFile, destFile, swi, sigFn )
-                  )
-   if ret != 0:
-      print( "Error: Cannot extract signature file %s from  %s" % ( sigFn, swi ) )
-      sys.exit( SWI_SIGN_RESULT.CANNOT_EXTRACT_SIGNATURE )
+def runCmd( cmd, workDir ):
+   try:
+      subprocess.check_call( cmd.split(" "), cwd=workDir )
+   except subprocess.CalledProcessError:
+      return False
+   return True
 
+def insertSignature( swi, sigFileName, workDir ):
+   cmd = "zip -q -0 -X %s %s" % ( os.path.abspath( swi ), sigFileName )
+   if not runCmd( cmd, workDir ):
+      msg = "Error: Cannot insert signature file '%s' into '%s'" % ( sigFileName, swi )
+      raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNATURE_INSERTION_FAILED, msg )
+
+def extractSignature( swi, destFile ):
+   sigFn = signaturelib.SWI_SIG_FILE_NAME
+   destDir = os.path.dirname( destFile )
+   cmd = "unzip -o -q %s %s" % ( os.path.abspath( swi ), sigFn )
+   if not runCmd( cmd, destDir ):
+      msg = "Error: Cannot extract signature file %s from  %s" % ( sigFn, swi )
+      raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNATURE_EXTRACTION_FAILED, msg )
+   os.rename( "%s/%s" % ( destDir, sigFn ), destFile )
+
+# get signature from remote signing server
 def getSignatureFile( swi, signatureFile ):
    serviceName = 'swi-signing-service'
    serviceBinary = shutil.which( serviceName )
    if not serviceBinary:
-      print( "Error: signing service '%s' not found" % serviceName )
-      sys.exit( SWI_SIGN_RESULT.ERROR_SIGNING_SERVER_FAILED )
+      msg = "Error: signing service '%s' not found" % serviceName
+      raise SwiSignException( SWI_SIGN_RESULT.ERROR_NO_SIGNING_SERVICE, msg )
 
    sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
    print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
    ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
    if ret != 0:
-      print( "Error: signing-server '%s' failed" % serviceBinary )
-      sys.exit( SWI_SIGN_RESULT.ERROR_SIGNING_SERVER_FAILED )
+      msg = "Error: signing-server '%s' failed" % serviceBinary
+      raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNING_SERVICE_FAILED, msg )
 
-def signSwiAll( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFile=None ):
+def signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFile=None ):
    # Sub-images ("optimizations") are extracted to /tmp. The utility 'swadapt' is
    # handling that extraction. swadapt is found inside the image itself and is a
    # statically linked i386 binary.
-   workDir = "/tmp/optims-%d" % os.getpid()
-   os.mkdir( workDir )
    # Make sure the image we got is a swi file
-   if ( not os.path.isfile( swi ) or
-        os.system( "set -e; image=$(readlink -f %s); cd %s;"
-                   "unzip -o -q $image version" % ( swi, workDir ) ) ):
-      print( "Error: '%s' does not look like an EOS image" % swi )
-      shutil.rmtree( workDir )
-      sys.exit( SWI_SIGN_RESULT.ERROR_NOT_A_SWI )
+   if not signaturelib.checkIsSwiFile( swi, workDir ):
+      raise SwiSignException( SWI_SIGN_RESULT.ERROR_NOT_A_SWI,
+                              "Error: '%s' does not look like an EOS image" % swi )
 
-   try:
-      optims = signaturelib.getOptimizations( swi, workDir )
-      if optims is None or len( optims ) == 1 or "DEFAULT" in optims:
-         # legacy case of a single rootfs image
-         # maybe need to use a remote signing service (new feature in v1.2)
-         if not signatureFile and not signingKeyFile:
-            signatureFile = "%s/sig" % workDir
-            getSignatureFile( swi, signatureFile ) # never returns in case of fail
-         if not signatureFile and not signingKeyFile:
-            print ( 'Error: without signing key we need a signature file: '
-                    'run "swi-signature prepare" first and have the digest it prints '
-                    'signed and passed to this command.' )
-            sys.exit( SWI_SIGN_RESULT.ERROR_NO_SIGNATURE_FILE_PROVIDED )
-         if not signatureFile and signingKeyFile:
-            sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
-            print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
-         # insert the signatureFile into the swi, or use the signing key to create the signatureFile first
-         return signSwi( swi, signingCertFile, rootCaFile,
-                         signatureFile=signatureFile, signingKeyFile=signingKeyFile )
+   optims = signaturelib.getOptimizations( swi, workDir )
+   if optims is None or len( optims ) == 1 or "DEFAULT" in optims:
+      # legacy case of a single rootfs image
+      # maybe need to use a remote signing service (new feature in v1.2)
+      if not signatureFile and not signingKeyFile:
+         signatureFile = "%s/sig" % workDir
+         getSignatureFile( swi, signatureFile ) # never returns in case of fail
+      if not signatureFile and not signingKeyFile:
+         msg = ( 'Error: without signing key we need a signature file: '
+                 'run "swi-signature prepare" first and have the digest it prints '
+                 'signed and passed to this command.' )
+         raise SwiSignException( SWI_SIGN_RESULT.ERROR_NO_SIGNATURE_FILE_PROVIDED, msg )
+      if not signatureFile and signingKeyFile:
+         sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
+         print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
+      # insert the signatureFile into the swi, or use the signing key to create the signatureFile first
+      return signSwi( swi, signingCertFile, rootCaFile,
+                      signatureFile=signatureFile, signingKeyFile=signingKeyFile )
 
-      print( "Optimizations in %s: %s" % ( swi, " ".join( optims ) ) )
-      signaturelib.extractSwadapt( swi, workDir )
-      optimSigFiles = []
-      for optim in optims:
-         optimImage = "%s/%s.swi" % ( workDir, optim )
-         # Adapt swi (extract an optimized image)
-         os.system("%s/swadapt %s %s %s" % ( workDir, swi, optimImage, optim ) )
-         if not signingKeyFile: # need to use a remote signing service
-            signatureFile = "%s/sig" % workDir
-            getSignatureFile( optimImage, signatureFile ) # never returns in case of fail
-         else:
-            sha256 = prepareSwi( swi=optimImage, outfile=None, forceSign=True )
-            print( "%s sha256: %s" % ( optim, sha256 ) )
-         # Sign optimized swi using provided key or provided full fledged signature file
-         signSwi( optimImage, signingCertFile, rootCaFile,
-                  signatureFile=signatureFile, signingKeyFile=signingKeyFile )
-
-         # Extract the signature from the optim and call it <optim>.sig
-         optimSigFile = "%s.signature" % optim
-         optimSigPath = "%s/%s" % ( workDir, optimSigFile )
-         optimSigFiles.append( os.path.basename( optimSigPath ) )
-         extractSignature( optimImage, optimSigPath )
-
-         os.remove( optimImage )
-
-      # update the source swi with the signatures of its "baby" swis (optims)
-      print( "Adding signature files to %s: %s" % ( swi, " ".join( optimSigFiles ) ) )
-      ret = os.system( "src=$(readlink -f %s); cd %s; "
-                       "zip -q -0 -X $src %s" % ( swi, workDir,
-                       " ".join( optimSigFiles ) ) )
-      if ret != 0:
-         print( "Error: cannot add signatures of optimizations to %s" % image )
-         sys.exit( -1 )
-
-      # And now sign the mother of all images
-      sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
-      print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
+   print( "Optimizations in %s: %s" % ( swi, " ".join( optims ) ) )
+   if not signaturelib.extractSwadapt( swi, workDir ):
+      raise SwiSignException( SWI_SIGN_RESULT.INTERNAL_ERROR,
+                              "Internal Error: could not extract swadapt utility from image" )
+   optimSigFiles = []
+   for optim in optims:
+      optimImage = "%s/%s.swi" % ( workDir, optim )
+      # Adapt swi (extract an optimized image)
+      if not signaturelib.adaptSwi( swi, optimImage, optim, workDir ):
+         msg = "Error: failed to extract optimization '%s' from image '%s' to '%s'" % (
+                  optim, swi, optimImage )
+         raise SwiSignException( SWI_SIGN_RESULT.INTERNAL_ERROR, msg )
       if not signingKeyFile: # need to use a remote signing service
          signatureFile = "%s/sig" % workDir
-         ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
-         if ret != 0:
-            print( "Error: signing-server failed for %s" % image )
-            sys.exit( -1 )
-      signSwi( swi, signingCertFile, rootCaFile,
+         getSignatureFile( optimImage, signatureFile ) # never returns in case of fail
+      else:
+         sha256 = prepareSwi( swi=optimImage, outfile=None, forceSign=True )
+         print( "%s sha256: %s" % ( optim, sha256 ) )
+      # Sign optimized swi using provided key or provided full fledged signature file
+      signSwi( optimImage, signingCertFile, rootCaFile,
                signatureFile=signatureFile, signingKeyFile=signingKeyFile )
-   finally:
-      shutil.rmtree( workDir )
+
+      # Extract the signature from the optim and call it <optim>.sig
+      optimSigFile = "%s.signature" % optim
+      optimSigPath = "%s/%s" % ( workDir, optimSigFile )
+      optimSigFiles.append( os.path.basename( optimSigPath ) )
+      extractSignature( optimImage, optimSigPath )
+
+      os.remove( optimImage )
+
+   # update the source swi with the signatures of its "baby" swis (optims)
+   print( "Adding signature files to %s: %s" % ( swi, " ".join( optimSigFiles ) ) )
+   insertSignature( swi, " ".join( optimSigFiles ), workDir )
+
+   # And now sign the mother of all images
+   sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
+   print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
+   if not signingKeyFile: # need to use a remote signing service
+      cmd = "swi-signing-service %s %s/sig" % ( sha256, workDir )
+      if not runCmd( cmd, workDir ):
+      #ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
+      #if ret != 0:
+         msg = "Error: signing-server failed"
+         raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNING_SERVICE_FAILED, msg )
+   signSwi( swi, signingCertFile, rootCaFile,
+            signatureFile=signatureFile, signingKeyFile=signingKeyFile )
 
 def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFile=None ):
    signature = ""
@@ -379,10 +377,10 @@ def main():
    try:
       args.func( args )
    except ( IOError, BIO.BIOError, EVP.EVPError ) as e:
-      print( e )
+      print( e, file=sys.stderr )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
    except SwiSignException as e:
-      print( e )
+      print( e, file=sys.stderr )
       exit( e.code )
    except AttributeError as e: # When main is called with no op.
       sys.exit( parser.format_help() )

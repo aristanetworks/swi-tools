@@ -9,8 +9,9 @@ import argparse
 import base64
 import binascii
 import os
+import sys
+import tempfile
 from pkg_resources import resource_string
-import shutil
 import zipfile
 from M2Crypto import X509
 
@@ -64,6 +65,8 @@ class VERIFY_SWI_RESULT:
    ERROR_CERT_MISMATCH = 8
    ERROR_INVALID_SIGNING_CERT = 9
    ERROR_INVALID_ROOT_CERT = 10
+   ERROR_NO_SWADAPT_UTIL = 11
+   ERROR_SWADAPT_FAILURE = 12
 
 VERIFY_SWI_MESSAGE = {
    VERIFY_SWI_RESULT.SUCCESS: "SWI/X verification successful.",
@@ -79,7 +82,15 @@ VERIFY_SWI_MESSAGE = {
                                                  " valid certificate.",
    VERIFY_SWI_RESULT.ERROR_INVALID_ROOT_CERT: "Root certificate is not a" \
                                               " valid certificate.",
+   VERIFY_SWI_RESULT.ERROR_NO_SWADAPT_UTIL: "Utility 'swadapt' not found in image.",
+   VERIFY_SWI_RESULT.ERROR_SWADAPT_FAILURE: "Utility 'swadapt' failed to extract sub-image.",
 }
+
+def printStatus( code ):
+   if code == VERIFY_SWI_RESULT.SUCCESS:
+      print( VERIFY_SWI_MESSAGE[ code ] )
+   else:
+      print( VERIFY_SWI_MESSAGE[ code ], file=sys.stderr )
 
 class X509CertException( Exception ):
    def __init__( self, code ):
@@ -207,39 +218,42 @@ def verifySwi( swi, rootCA=ROOT_CA_FILE_NAME ):
    except X509CertException as e:
       return e.code
 
-def verifyAllSwi( swi, rootCA=ROOT_CA_FILE_NAME ):
+def verifyAllSwi( workDir, swi, rootCA=ROOT_CA_FILE_NAME ):
    # We will extract sub-images to /tmp to verify their signatures
-   workDir = "/tmp/verify-optims-%d" % os.getpid()
-   os.mkdir( workDir )
-   finalRetCode = VERIFY_SWI_RESULT.SUCCESS
+   subImageError = False
 
-   try:
-      # Make sure the image we got is a swi file
-      if ( not os.path.isfile( swi ) or
-           os.system( "set -e; image=$(readlink -f %s); cd %s;"
-                      "unzip -o -q $image version" % ( swi, workDir ) ) ):
-         return VERIFY_SWI_RESULT.ERROR_NOT_A_SWI
-      optims = signaturelib.getOptimizations( swi, workDir )
-      # If image has multiple sub-images, verify each
-      if not ( optims is None or len( optims ) == 1 or "DEFAULT" in optims ):
-         print( "Optimizations in %s: %s" % ( swi, " ".join( optims ) ) )
-         signaturelib.extractSwadapt( swi, workDir )
-         for optim in optims:
-            optimImage = "%s/%s.swi" % ( workDir, optim )
-            # extract sub-image
-            os.system("%s/swadapt %s %s %s" % ( workDir, swi, optimImage, optim ) )
-            retCode = verifySwi( optimImage, rootCA )
-            os.remove( optimImage )
-            print( "%s: %s" % ( optim, VERIFY_SWI_MESSAGE[ retCode ] ) )
-            if retCode != VERIFY_SWI_RESULT.SUCCESS:
-               finalRetCode = VERIFY_SWI_RESULT.ERROR
-      # Finally check the container image (or legacy "one level" image)
-      retCode = verifySwi( swi, rootCA )
-      print( VERIFY_SWI_MESSAGE[ retCode ] )
-   finally:
-      shutil.rmtree( workDir )
+   # Make sure the image we got is a swi file
+   if not signaturelib.checkIsSwiFile( swi, workDir ):
+      print( "Error: '%s' does not look like an EOS image" % swi )
+      return VERIFY_SWI_RESULT.ERROR_NOT_A_SWI
+   optims = signaturelib.getOptimizations( swi, workDir )
+   # If image has multiple sub-images, verify each (don't stop at failure, print
+   # each error and return a generic error code) and finally check container image
+   if not ( optims is None or len( optims ) == 1 or "DEFAULT" in optims ):
+      print( "Optimizations in %s: %s" % ( swi, " ".join( optims ) ) )
+      if not signaturelib.extractSwadapt( swi, workDir ):
+         retCode = VERIFY_SWI_RESULT.ERROR_NO_SWADAPT_UTIL
+         printStatus( retCode )
+         return retCode
+      for optim in optims:
+         optimImage = "%s/%s.swi" % ( workDir, optim )
+         # extract sub-image
+         if not signaturelib.adaptSwi( swi, optimImage, optim, workDir ):
+            retCode = VERIFY_SWI_RESULT.ERROR_SWADAPT_FAILURE
+            printStatus( retCode )
+            return retCode
+         retCode = verifySwi( optimImage, rootCA )
+         os.remove( optimImage )
+         print( "%s: %s" % ( optim, VERIFY_SWI_MESSAGE[ retCode ] ) )
+         if retCode != VERIFY_SWI_RESULT.SUCCESS:
+            subImageError = True
+   # Finally check the container image (or legacy "one level" image)
+   retCode = verifySwi( swi, rootCA )
+   printStatus( retCode )
+   if subImageError:
+      retCode = VERIFY_SWI_RESULT.ERROR
 
-   return finalRetCode
+   return retCode
 
 def main():
    helpText = "Verify Arista SWI image or SWIX extension"
@@ -255,7 +269,8 @@ def main():
 
    # swi images in swi format 3.0 can contain multiple sub-images that each have
    # their own signature.
-   retCode = verifyAllSwi( swi, rootCA )
+   with tempfile.TemporaryDirectory( prefix="swi-verify-" ) as workDir:
+      retCode = verifyAllSwi( workDir, swi, rootCA )
    exit( retCode )
 
 if __name__ == "__main__":

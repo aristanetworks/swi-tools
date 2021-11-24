@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.7
 import os
+import tempfile
 import sys
 from base64 import b64encode
 
@@ -18,13 +19,14 @@ def main():
 
    if len( sys.argv ) != 3:
       print( "Error" )
-      print( "usage: %s <sha256-string> <file-to-hold-signed-sha256-string>" % sys.argv[0] )
+      print( "usage: %s <sha256-string> <file-to-hold-signed-sha256-string>" % 
+                     sys.argv[0] )
       sys.exit( -1 )
    
    digest = sys.argv[1]
    resultFile = sys.argv[2]
    
-   padSha256k4096="0001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00"
+   padSha256k4096="0001" + "ff"*458 + "00"
    sha256Magic = "3031300d060960864801650304020105000420"
    
    # Generate signature from sha256 hash and private key
@@ -35,12 +37,14 @@ def main():
    
    digest = int( "%s%s%s" % ( padSha256k4096, sha256Magic, digest ), 16 )
    workDir = "/tmp/swi-signing-service-%d" % os.getpid()
-   os.system( "mkdir %s" % workDir )
-   os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | sed -n '/modulus:/,/^[^ ]/p' | sed '1d' | sed '$d' | sed 's/ //g' | sed 's/://g' | tr -d '\n' > %s/m" % workDir )
-   os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | sed -n '/privateExponent:/,/^[^ ]/p' | sed '1d' | sed '$d' | sed 's/ //g' | sed 's/://g' | tr -d '\n' > %s/e" % workDir )
-   m = int( open( "%s/m" % workDir).read(), 16 ) # not bothering to close()...
-   e = int( open( "%s/e" % workDir).read(), 16 )
-   os.system( "rm -rf %s" % workDir )
+   with tempfile.TemporaryDirectory( prefix="swi-signing-service-" ) as workDir:
+      cleanOut = r"sed '1d' | sed '$d' | sed 's/ //g' | sed 's/://g' | tr -d '\n' "
+      os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | " +
+                 "sed -n '/modulus:/,/^[^ ]/p' | %s > %s/m" % ( cleanOut, workDir ) )
+      os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | " +
+                 "sed -n '/privateExponent:/,/^[^ ]/p' | %s > %s/e" % ( cleanOut, workDir ) )
+      m = int( open( "%s/m" % workDir).read(), 16 ) # not bothering to close()...
+      e = int( open( "%s/e" % workDir).read(), 16 )
    signature = pow( digest, e, m )
    signature_bytes = signature.to_bytes( 512, byteorder='big', signed=False )
    b64_signature = b64encode( signature_bytes )

@@ -1,10 +1,9 @@
-#!/usr/bin/env python3.7
 import os
 import tempfile
 import sys
 from base64 import b64encode
 
-# Just a simple implementation of a signing service for testing purposes.
+# Just a simple implementation of a signing service for testing/demo purposes.
 # This signing service does not contact any signing server, it just uses a local 
 # signing key and uses that to sign the given sha256. Eos signatures are over the
 # sha256sum of the image with a 4k key size, we just handle that case.
@@ -13,7 +12,7 @@ from base64 import b64encode
 # script). The swi-signature also passes the filename were the resulting signature
 # should be placed in.
 # This script assumes the signer's key to be in /etc/swi-signing-devCA/signing.key
-# (and does not bother to verify if it exists, this is just test code).
+# and can be overriden via env var SWI_SIGNING_KEY (used in self test).
 
 def main():
 
@@ -28,6 +27,11 @@ def main():
    
    padSha256k4096="0001" + "ff"*458 + "00"
    sha256Magic = "3031300d060960864801650304020105000420"
+
+   signingKey = os.environ.get( "SWI_SIGNING_KEY", "/etc/swi-signing-devCA/signing.key" )
+   if not os.path.isfile( signingKey ):
+      print( "Error: signing-key '%s' not found" % signingKey, file=sys.stderr )
+      sys.exit( -1 )
    
    # Generate signature from sha256 hash and private key
    # pad the hash to the key length, and encode the hashing method into it as per RSAES-PKCS1-V1_5
@@ -39,9 +43,9 @@ def main():
    workDir = "/tmp/swi-signing-service-%d" % os.getpid()
    with tempfile.TemporaryDirectory( prefix="swi-signing-service-" ) as workDir:
       cleanOut = r"sed '1d' | sed '$d' | sed 's/ //g' | sed 's/://g' | tr -d '\n' "
-      os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | " +
+      os.system( "openssl rsa -in %s -text -noout | " % signingKey +
                  "sed -n '/modulus:/,/^[^ ]/p' | %s > %s/m" % ( cleanOut, workDir ) )
-      os.system( "openssl rsa -in /etc/swi-signing-devCA/signing.key -text -noout | " +
+      os.system( "openssl rsa -in %s -text -noout | " % signingKey +
                  "sed -n '/privateExponent:/,/^[^ ]/p' | %s > %s/e" % ( cleanOut, workDir ) )
       m = int( open( "%s/m" % workDir).read(), 16 ) # not bothering to close()...
       e = int( open( "%s/e" % workDir).read(), 16 )

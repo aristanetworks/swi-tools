@@ -1,0 +1,188 @@
+
+# Without Signing-Service (with key on command line)
+# =======================
+> swi-signature sign tmp/EOS.swim certs/signer.cert certs/root.cert --key certs/signer.key
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default sha256: xxx
+Sand-4GB sha256: xxx
+Strata-4GB sha256: xxx
+Adding signature files to tmp/EOS.swim: Default.signature Sand-4GB.signature Strata-4GB.signature
+EOS.swim sha256: xxx
+SWI/X file tmp/EOS.swim successfully signed and verified.
+retCode: 0
+stderr: 
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification successful.
+Strata-4GB: SWI/X verification successful.
+SWI/X verification successful.
+retCode: 0
+stderr: 
+
+# With Signing-Service
+# ====================
+> SWI_SIGNING_KEY=/swi-tools/tests/certs/signer.key swi-signature sign tmp/EOS.swim certs/signer.cert certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default.swi sha256: xxx
+Sand-4GB.swi sha256: xxx
+Strata-4GB.swi sha256: xxx
+Adding signature files to tmp/EOS.swim: Default.signature Sand-4GB.signature Strata-4GB.signature
+EOS.swim sha256: xxx
+SWI/X file tmp/EOS.swim successfully signed and verified.
+retCode: 0
+stderr: 
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification successful.
+Strata-4GB: SWI/X verification successful.
+SWI/X verification successful.
+retCode: 0
+stderr: 
+
+# Legacy image, one step (with key or with new singing-service)
+# ======================
+> swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert --key certs/signer.key
+EOS.swi sha256: xxx
+SWI/X file tmp/EOS.swi successfully signed and verified.
+retCode: 0
+stderr: 
+> verify-swi tmp/EOS.swi --CAfile certs/root.cert
+SWI/X verification successful.
+retCode: 0
+stderr: 
+> SWI_SIGNING_KEY=/swi-tools/tests/certs/signer.key swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert
+EOS.swi sha256: xxx
+SWI/X file tmp/EOS.swi successfully signed and verified.
+retCode: 0
+stderr: 
+> verify-swi tmp/EOS.swi --CAfile certs/root.cert
+SWI/X verification successful.
+retCode: 0
+stderr: 
+
+# Legacy image, two steps
+# =======================
+0
+> swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert --signature=/tmp/test-signed-sha256
+SWI/X file tmp/EOS.swi successfully signed and verified.
+retCode: 0
+stderr: 
+> verify-swi tmp/EOS.swi --CAfile certs/root.cert
+SWI/X verification successful.
+retCode: 0
+stderr: 
+
+# Check signature is not successful my chance
+# ===========================================
+# Touching the signature will invalidate the signature
+> unzip -oq tmp/EOS.swim swi-signature
+> cp --preserve=timestamps swi-signature swi-signature.orig
+> touch swi-signature
+> zip -0 -X -q tmp/EOS.swim swi-signature
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification successful.
+Strata-4GB: SWI/X verification successful.
+retCode: 4
+stderr: SWI/X verification failed.
+
+# Corrupt the certificate (and restore the timestamp)
+> sed -i 's/IssuerCert:.../IssuerCert:xxx/' swi-signature
+> touch -r swi-signature.orig swi-signature # restore timestamp
+> zip -0 -X -q tmp/EOS.swim swi-signature
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification successful.
+Strata-4GB: SWI/X verification successful.
+retCode: 9
+stderr: Signing certificate is not a valid certificate.
+
+# restore the certificate, add an inner image error
+> cp --preserve=timestamps swi-signature.orig swi-signature
+> unzip -oq tmp/EOS.swim Sand-4GB.signature
+> cp --preserve=timestamps Sand-4GB.signature Sand-4GB.signature.orig
+> touch Sand-4GB.signature
+> sed -i 's/IssuerCert:.../IssuerCert:xxx/' Sand-4GB.signature
+> zip -0 -X -q tmp/EOS.swim swi-signature Sand-4GB.signature
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: Signing certificate is not a valid certificate.
+Strata-4GB: SWI/X verification successful.
+retCode: 255
+stderr: SWI/X verification failed.
+
+# Double check: fix up things, should work again.
+> cp --preserve=timestamps swi-signature.orig swi-signature
+> cp --preserve=timestamps Sand-4GB.signature.orig Sand-4GB.signature
+> zip -0 -X -q tmp/EOS.swim swi-signature Sand-4GB.signature
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification successful.
+Strata-4GB: SWI/X verification successful.
+SWI/X verification successful.
+retCode: 0
+stderr: 
+
+# delete an inner signature
+> zip -d tmp/EOS.swim Sand-4GB.signature
+deleting: Sand-4GB.signature
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification failed.
+Strata-4GB: SWI/X verification successful.
+retCode: 255
+stderr: SWI/X verification failed.
+
+# delete outer signature file
+> zip -d tmp/EOS.swim swi-signature
+deleting: swi-signature
+> verify-swi tmp/EOS.swim --CAfile certs/root.cert
+Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
+Default: SWI/X is not signed.
+Sand-4GB: SWI/X is not signed.
+Strata-4GB: SWI/X is not signed.
+retCode: 255
+stderr: SWI/X is not signed.
+
+
+# restore all
+
+# Error cases
+# ===========
+# bad image name
+> swi-signature sign what-image.swi certs/signer.cert certs/root.cert
+retCode: 4
+stderr: Error: 'what-image.swi' does not look like an EOS image
+
+# bad image file
+> swi-signature sign tmp/some.zip certs/signer.cert certs/root.cert
+retCode: 4
+stderr: Error: 'tmp/some.zip' does not look like an EOS image
+
+# already signed image
+> swi-signature prepare tmp/EOS.swi
+retCode: 1
+stderr: SWI/X is already signed. Please check the signature with verify-swi command. To re-sign, use the --force-sign option.
+
+# invalid signature
+> swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert --signature=/tmp/test-signed-sha256
+retCode: 2
+stderr: Error: Verification on the signed SWI/X failed.
+> verify-swi tmp/EOS.swi --CAfile certs/root.cert
+retCode: 4
+stderr: SWI/X verification failed.
+
+# error in signing service, no key found
+> SWI_SIGNING_KEY=doesNotExist swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert
+EOS.swi sha256: xxx
+retCode: 8
+stderr: Error: signing-key 'doesNotExist' not found
+Error: signing-server '/usr/local/bin/swi-signing-service' failed
+Tests finished

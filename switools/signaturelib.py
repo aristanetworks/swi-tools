@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function
 import os
 import subprocess
+import zipfile
 
 SWI_SIG_FILE_NAME = 'swi-signature'
 SWIX_SIG_FILE_NAME = 'swix-signature'
@@ -22,24 +23,17 @@ def runCmd( cmd, workDir ):
    return True
 
 def getOptimizations( swi, workDir ):
-   # unzip spits warnings when extracting non-existant files, so check first :-(
-   cmd = "unzip -Z1 %s" % swi
-   if not "swimSqshMap" in str( subprocess.check_output( cmd.split(" ") ) ):
-      return None # legacy image
-   cmd = "unzip -qq -o %s swimSqshMap" % os.path.abspath( swi )
-   try:
-      subprocess.check_call( cmd.split(" "), cwd=workDir )
-   except subprocess.CalledProcessError:
-      return None # legacy image
-
-   optims = []
-   with open( "%s/swimSqshMap" % workDir ) as f:
-      for line in f:
+   with zipfile.ZipFile( swi ) as zf:
+      if 'swimSqshMap' not in zf.namelist():
+         return None
+      optims = []
+      for line in zf.read( 'swimSqshMap' ).decode( 'utf-8' ).split():
          optim, _ = line.split( "=", 1 )
          optims.append( optim )
-   return optims
+      return optims
 
 def extractSwadapt( swi, workDir ):
+   # zipfile.py does not honor file settings like +x, so use proven /usr/bin/zip
    cmd = "unzip -o -qq %s swadapt" % os.path.abspath( swi )
    return runCmd( cmd, workDir )
 

@@ -101,7 +101,8 @@ Strata-4GB: SWI/X verification successful.
 retCode: 9
 stderr: Signing certificate is not a valid certificate.
 
-# restore the certificate, add an inner image error
+# Restore the certificate, add an inner image signature error
+# note in case of inner errors, the final error is a generic one
 > cp --preserve=timestamps swi-signature.orig swi-signature
 > unzip -oq tmp/EOS.swim Sand-4GB.signature
 > cp --preserve=timestamps Sand-4GB.signature Sand-4GB.signature.orig
@@ -116,7 +117,7 @@ Strata-4GB: SWI/X verification successful.
 retCode: 255
 stderr: SWI/X verification failed.
 
-# Double check: fix up things, should work again.
+# Double check: fix things back up, should work again.
 > cp --preserve=timestamps swi-signature.orig swi-signature
 > cp --preserve=timestamps Sand-4GB.signature.orig Sand-4GB.signature
 > zip -0 -X -q tmp/EOS.swim swi-signature Sand-4GB.signature
@@ -129,7 +130,7 @@ SWI/X verification successful.
 retCode: 0
 stderr: 
 
-# delete an inner signature
+# Delete an inner signature
 > zip -d tmp/EOS.swim Sand-4GB.signature
 deleting: Sand-4GB.signature
 > verify-swi tmp/EOS.swim --CAfile certs/root.cert
@@ -140,7 +141,8 @@ Strata-4GB: SWI/X verification successful.
 retCode: 255
 stderr: SWI/X verification failed.
 
-# delete outer signature file
+# Delete outer signature file
+# Note that this will also delete the inner signature files during adaptation
 > zip -d tmp/EOS.swim swi-signature
 deleting: swi-signature
 > verify-swi tmp/EOS.swim --CAfile certs/root.cert
@@ -151,8 +153,9 @@ Strata-4GB: SWI/X is not signed.
 retCode: 255
 stderr: SWI/X is not signed.
 
-
 # restore all
+> cp EOS.swi.1.0 tmp/EOS.swi
+> cp EOS.swi.3.0 tmp/EOS.swim
 
 # Error cases
 # ===========

@@ -177,6 +177,7 @@ def insertSignature( swi, sigFileName, workDir ):
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNATURE_INSERTION_FAILED, msg )
 
 def extractSignature( swi, destFile ):
+   # We use zip instead of zipfile.py because zipfile does not honor the timestsamp
    sigFn = signaturelib.SWI_SIG_FILE_NAME
    destDir = os.path.dirname( destFile )
    cmd = "unzip -o -q %s %s" % ( os.path.abspath( swi ), sigFn )
@@ -195,8 +196,8 @@ def getSignatureFile( swi, signatureFile ):
 
    sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )
    print( "%s sha256: %s" % ( os.path.basename( swi ), sha256 ) )
-   ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
-   if ret != 0:
+   cmd = "swi-signing-service %s %s" % ( sha256, signatureFile )
+   if not runCmd( cmd, "/tmp" ):
       msg = "Error: signing-server '%s' failed" % serviceBinary
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNING_SERVICE_FAILED, msg )
 
@@ -268,8 +269,6 @@ def signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile=None, s
    if not signingKeyFile: # need to use a remote signing service
       cmd = "swi-signing-service %s %s/sig" % ( sha256, workDir )
       if not runCmd( cmd, workDir ):
-      #ret = subprocess.check_call( [ 'swi-signing-service', sha256, signatureFile ] )
-      #if ret != 0:
          msg = "Error: signing-server failed"
          raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNING_SERVICE_FAILED, msg )
    signSwi( swi, signingCertFile, rootCaFile,

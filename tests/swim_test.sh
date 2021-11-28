@@ -7,6 +7,7 @@ mkdir -p tmp
 # Redirect output to a log file to compare to reference output later.
 logFile=$(basename ${0%.*}.log)
 logRef=$(basename ${0%.*}.ref)
+rm -f $logFile
 echo "Test output is redirected to '$dir/$logFile', and later compared to reference '$dir/$logRef'"
 exec 3>&1 # save stdout to fd 3
 exec 1<> $logFile # open stdout to log file
@@ -137,7 +138,8 @@ srun "touch -r swi-signature.orig swi-signature # restore timestamp"
 srun "zip -0 -X -q $mimage swi-signature"
 run "verify-swi $mimage --CAfile $rootCert"
 echo ""
-echo "# restore the certificate, add an inner image error"
+echo "# Restore the certificate, add an inner image signature error"
+echo "# note in case of inner errors, the final error is a generic one"
 srun "cp --preserve=timestamps swi-signature.orig swi-signature"
 srun "unzip -oq $mimage Sand-4GB.signature"
 srun "cp --preserve=timestamps Sand-4GB.signature Sand-4GB.signature.orig"
@@ -146,28 +148,24 @@ srun "sed -i 's/IssuerCert:.../IssuerCert:xxx/' Sand-4GB.signature"
 srun "zip -0 -X -q $mimage swi-signature Sand-4GB.signature"
 run "verify-swi $mimage --CAfile $rootCert"
 echo ""
-echo "# Double check: fix up things, should work again."
+echo "# Double check: fix things back up, should work again."
 srun "cp --preserve=timestamps swi-signature.orig swi-signature"
 srun "cp --preserve=timestamps Sand-4GB.signature.orig Sand-4GB.signature"
 srun "zip -0 -X -q $mimage swi-signature Sand-4GB.signature"
 run "verify-swi $mimage --CAfile $rootCert"
 echo ""
-echo "# delete an inner signature"
+echo "# Delete an inner signature"
 srun "zip -d $mimage Sand-4GB.signature"
 run "verify-swi $mimage --CAfile $rootCert"
 echo ""
-echo "# delete outer signature file"
+echo "# Delete outer signature file"
+echo "# Note that this will also delete the inner signature files during adaptation"
 srun "zip -d $mimage swi-signature"
 run "verify-swi $mimage --CAfile $rootCert"
 echo ""
-echo ""
 echo "# restore all"
-cp EOS.swi.1.0 $limage
-cp EOS.swi.3.0 $mimage
-#srun "cp --preserve=timestamps swi-signature.orig swi-signature"
-#srun "cp --preserve=timestamps Sand-4GB.signature.orig Sand-4GB.signature"
-#srun "zip -0 -X -q $mimage swi-signature Sand-4GB.signature"
-#run "verify-swi $mimage --CAfile $rootCert"
+srun "cp EOS.swi.1.0 $limage"
+srun "cp EOS.swi.3.0 $mimage"
 
 echo
 echo "# Error cases"

@@ -15,9 +15,9 @@ def getSigFileName( swiFile ):
       return SWIX_SIG_FILE_NAME
    return SWI_SIG_FILE_NAME
 
-def runCmd( cmd, workDir ):
+def runCmd( cmd, workDir=None ):
    try:
-      subprocess.check_call( cmd.split(" "), cwd=workDir )
+      subprocess.check_call( cmd, cwd=workDir )
    except subprocess.CalledProcessError:
       return False
    return True
@@ -34,19 +34,19 @@ def getOptimizations( swi, workDir ):
 
 def extractSwadapt( swi, workDir ):
    # zipfile.py does not honor file settings like +x, so use proven /usr/bin/zip
-   cmd = "unzip -o -qq %s swadapt" % os.path.abspath( swi )
+   cmd = [ "unzip", "-o", "-qq", os.path.abspath( swi ), "swadapt" ]
    return runCmd( cmd, workDir )
 
 def checkIsSwiFile( swi, workDir ):
    if not os.path.isfile( swi ):
       return False
    # unzip spits warnings when extracting non-existant files, so check first :-(
-   cmd = "unzip -Z1 %s" % swi
-   if not "version" in subprocess.check_output( cmd.split(" ") ).decode( 'utf-8' ).split():
+   cmd = [ "unzip", "-Z1", swi ]
+   if not "version" in subprocess.check_output( cmd ).decode( 'utf-8' ).split():
       return None # legacy image
-   cmd = "unzip -o -qq %s version" % os.path.abspath( swi )
+   cmd = [ "unzip", "-o", "-qq", os.path.abspath( swi ), "version" ]
    return runCmd( cmd, workDir )
 
 def adaptSwi( swi, optimImage, optim, workDir ):
-   cmd = "%s/swadapt %s %s %s" % ( workDir, os.path.abspath( swi ), optimImage, optim )
+   cmd = [ "%s/swadapt" % workDir, os.path.abspath( swi ), optimImage, optim ]
    return runCmd( cmd, workDir )

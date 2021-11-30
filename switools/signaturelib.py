@@ -40,12 +40,10 @@ def extractSwadapt( swi, workDir ):
 def checkIsSwiFile( swi, workDir ):
    if not os.path.isfile( swi ):
       return False
-   # unzip spits warnings when extracting non-existant files, so check first :-(
-   cmd = [ "unzip", "-Z1", swi ]
-   if not "version" in subprocess.check_output( cmd ).decode( 'utf-8' ).split():
-      return None # legacy image
-   cmd = [ "unzip", "-o", "-qq", os.path.abspath( swi ), "version" ]
-   return runCmd( cmd, workDir )
+   with zipfile.ZipFile( swi ) as zf:
+      if 'version' not in zf.namelist():
+         return False
+      return True
 
 def adaptSwi( swi, optimImage, optim, workDir ):
    cmd = [ "%s/swadapt" % workDir, os.path.abspath( swi ), optimImage, optim ]

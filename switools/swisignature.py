@@ -144,9 +144,8 @@ def prepareSwi( swi, outfile=None, forceSign=False, size=SWI_SIGNATURE_MAX_SIZE 
    data = '\000' * size
    with tempfile.TemporaryDirectory( prefix="swi-nullsig-" ) as tmpDir:
       sigFileName = signaturelib.getSigFileName( swiFile )
-      f = open( "%s/%s" % ( tmpDir, sigFileName ), "w" )
-      f.write( data )
-      f.close()
+      with open( "%s/%s" % ( tmpDir, sigFileName ), "w" ) as f:
+         f.write( data )
       insertSignature( swiFile, sigFileName, tmpDir )
 
    # Return SHA-256 hash of null SWI

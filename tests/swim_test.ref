@@ -22,7 +22,7 @@ stderr:
 
 # With Signing-Service
 # ====================
-> SWI_SIGNING_KEY=/swi-tools/tests/certs/signer.key swi-signature sign tmp/EOS.swim certs/signer.cert certs/root.cert
+> SWI_SIGNING_KEY=__PWD__/certs/signer.key swi-signature sign tmp/EOS.swim certs/signer.cert certs/root.cert
 Optimizations in tmp/EOS.swim: Default Sand-4GB Strata-4GB
 Default.swi sha256: xxx
 Sand-4GB.swi sha256: xxx
@@ -52,7 +52,7 @@ stderr:
 SWI/X verification successful.
 retCode: 0
 stderr: 
-> SWI_SIGNING_KEY=/swi-tools/tests/certs/signer.key swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert
+> SWI_SIGNING_KEY=__PWD__/certs/signer.key swi-signature sign tmp/EOS.swi certs/signer.cert certs/root.cert
 EOS.swi sha256: xxx
 SWI/X file tmp/EOS.swi successfully signed and verified.
 retCode: 0

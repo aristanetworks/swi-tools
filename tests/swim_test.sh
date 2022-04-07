@@ -198,5 +198,6 @@ echo "Tests finished"
 exec 1>&3 # restore orignal stdout
 exec 3<&- # close the copy
 # report results
-diff -up $logRef $logFile && echo "Test PASSED" || { echo "Test FAILED"; exit -1; }
+cat $logRef | sed 's#__PWD__#'"$(pwd)"'#' > tmp/logRefLoc
+diff -up tmp/logRefLoc $logFile && echo "Test PASSED" || { echo "Test FAILED"; exit -1; }
 

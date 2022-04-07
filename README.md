@@ -272,5 +272,9 @@ Above's output was for a 4.27.2+ image (which has multiple contained images)
 ## Testing
 To run unit tests:
 ``` 
-python setup.py test 
+python3 setup.py test 
+```
+End-to-end tests after install:
+``` 
+./tests/swim_test.sh 
 ```

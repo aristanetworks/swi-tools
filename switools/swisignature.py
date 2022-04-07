@@ -146,7 +146,7 @@ def prepareSwi( swi, outfile=None, forceSign=False, size=SWI_SIGNATURE_MAX_SIZE 
       sigFileName = signaturelib.getSigFileName( swiFile )
       with open( "%s/%s" % ( tmpDir, sigFileName ), "w" ) as f:
          f.write( data )
-      insertSignature( swiFile, sigFileName, tmpDir )
+      insertSignature( swiFile, [ sigFileName ], tmpDir )
 
    # Return SHA-256 hash of null SWI
    nullSwiHash = generateHash( swiFile, 'SHA-256' )
@@ -169,11 +169,11 @@ def runCmd( cmd, workDir=None ):
       return False
    return True
 
-def insertSignature( swi, sigFileName, workDir ):
+def insertSignature( swi, sigFileNames, workDir ):
    cmd = [ "zip", "-q", "-0", "-X", os.path.abspath( swi ) ]
-   cmd = cmd + sigFileName.split( " " )
+   cmd = cmd + sigFileNames
    if not runCmd( cmd, workDir ):
-      msg = "Error: Cannot insert signature file '%s' into '%s'" % ( sigFileName, swi )
+      msg = "Error: Cannot insert signature file(s) '%s' into '%s'" % ( sigFileNames, swi )
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_SIGNATURE_INSERTION_FAILED, msg )
 
 def extractSignature( swi, destFile ):
@@ -261,7 +261,7 @@ def signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile=None, s
 
    # update the source swi with the signatures of its "baby" swis (optims)
    print( "Adding signature files to %s: %s" % ( swi, " ".join( optimSigFiles ) ) )
-   insertSignature( swi, " ".join( optimSigFiles ), workDir )
+   insertSignature( swi, optimSigFiles, workDir )
 
    # And now sign the mother of all images
    sha256 = prepareSwi( swi=swi, outfile=None, forceSign=True )

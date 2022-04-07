@@ -10,6 +10,7 @@ A SWIX is a SoftWare Image eXtension, a collection of files (ex RPMs, squashfs) 
 * **verify-swi**: Verify the cryptographic signature of an Arista SWI or SWIX
 * **verify-swix**: A convenience alias for the above
 * **swix-create**: Create a new SWIX file
+* **swi-signing-service**: Simple example of a signing service (all local)
 
 ## Installation
 ```
@@ -94,6 +95,10 @@ Signing an Arista SWI or SWIX is a multi-step process involving the `swi-signatu
 a null signature file (a fix-sized signature file made entirely of null bytes) is added to the SWI/X, at the path `/swi-signature` (for SWI files) or `/swix-signature` (for SWIX files) in the zip file. 
 Next, a signature is generated from the resulting SWI/X using a signing key. Finally, with `swi-signature sign`, the null signature file in the SWI/X is 
 updated to reflect both the signature that was generated and the signing certificate used to verify the signature.
+
+For EOS images starting 4.27.2, the process changes a little. For that, version 1.2 of this tool is needed.
+That is because a 4.27.2 image will contain multiple images, thus the prepare/sign split becomes inpractical. Instead, one has to provide a "swi-signing-server" binary (somewhere in PATH) that given a digest will return it signed. In that case, the swi-signing-server has access to the signer's private key. There is an example of how such a swi-signing-server could look like (it is using a local key). So in case no signer key is provided on the command line, providing a signatureFile instead will no longer do (it will still work though if the image is a pre 4.27.2 image).
+With 4.27.2+ images, the null-signature is automaticaly added and will overwrite any pre-existing signature forcefully.
 
 ### 1. Preparing the SWI/X for signing
 Before generating a signature of the SWI/X, the SWI/X must be pre-signed with a null signature, a fix-sized signature file made entirely of null bytes. 
@@ -196,6 +201,28 @@ SWI file EOS.swi successfully signed and verified.
 ```
 Signs EOS.swi using `signing.crt`. The signature used is created by signing the hash of EOS.swi with `signing.key`.
 
+#### 2c. Signing EOS 4.27.2+ SWI with direct access to private key
+Example:
+```
+$ swi-signature sign EOS.swi /etc/swi-signing/signing.crt /etc/swi-signing/root.crt --key /etc/swi-signing/signing.key
+Optimizations in EOS.swi: Default Sand-4GB Strata-4GB
+Default sha256: a3276b9976bb2471838dc95fbd2a38dcf1e7e5510bcfa8dfe0f0eff8b935a709
+Sand-4GB sha256: 4d0d23293eaecc7f55e7ee9776b0c250bef1a335e1b4ea28ef4eea989eb917f9
+Strata-4GB sha256: 520cbde6d60d1089bfbc95d9086c47ce4a6fc0399a5b8a29fc6c1bd95c7d029a
+Adding signature files to EOS.swi: Default.signature Sand-4GB.signature Strata-4GB.signature
+EOS.swi sha256: 913eb842e408ceddea914543230c9e13ff63e360fc6a6735ef9c0c1571209fb3
+SWI/X file EOS.swi successfully signed and verified.
+```
+#### 2d. Signing EOS 4.27.2+ SWI without direct access to private key
+Example:
+```
+$ which swi-signing-service
+/usr/local/bin/swi-signing-service
+
+$ swi-signature sign EOS.swi /etc/swi-signing/signing.crt /etc/swi-signing/root.crt
+... (same as above)
+```
+
 ## Verifying an Arista SWI/X signature
 The `verify-swi` script verifies the signature in a SWI or SWIX by checking that the signing certificate
 used to sign the SWI/X is trusted by a specified root certificate, and that signing the SWI/X with the signing certificate matches
@@ -232,9 +259,22 @@ $ echo $?
 0
 ```
 Here EOS.swi is verified using `root.crt`. Verification in this case was successful.
+```
+$ verify-swi EOS.swi --CAfile /etc/swi-signing/root.crt
+Optimizations in EOS.swi: Default Sand-4GB Strata-4GB
+Default: SWI/X verification successful.
+Sand-4GB: SWI/X verification successful.
+Strata-4GB: SWI/X verification successful.
+SWI/X verification successful.
+```
+Above's output was for a 4.27.2+ image (which has multiple contained images)
 
 ## Testing
 To run unit tests:
 ``` 
-python setup.py test 
+python3 setup.py test 
+```
+End-to-end tests after install:
+``` 
+./tests/swim_test.sh 
 ```

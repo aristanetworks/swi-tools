@@ -8,7 +8,7 @@ with open('README.md') as f:
     long_description = f.read()
 
 setup( name='switools',
-       version='1.1',
+       version='1.2',
        description='Tools for handling Arista SWI/X',
        long_description=long_description,
        long_description_content_type='text/markdown',
@@ -21,6 +21,7 @@ setup( name='switools',
                                 'swix-create=swixtools.create:main',
                                 'swix-signature=switools.swisignature:main',
                                 'verify-swix=switools.verifyswi:main',
+                                'swi-signing-service=switools.swisigningservice:main'
                               ],
        },
        url='https://github.com/aristanetworks/swi-tools',

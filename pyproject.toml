@@ -13,14 +13,16 @@ dependencies = [
     "m2crypto>=0.45.1",
     "pyparsing>=3.2.3",
     "pyyaml>=6.0.2",
+    "typer>=0.16.0",
 ]
 
 [project.scripts]
-verify-swi = "switools.verify:main"
-swi-signature = "switools.signature:main"
-swix-create = "switools.create:main"
-swix-signature = "switools.signature:main"
-verify-swix = "switools.verify:main"
+swi-tools = "switools.__main__:main"
+verify-swi = "switools.verify:app"
+swi-signature = "switools.signature:app"
+swix-create = "switools.create:app"
+swix-signature = "switools.signature:app"
+verify-swix = "switools.verify:app"
 swi-signing-service = "switools.signingservice:main"
 
 [tool.hatch.build]

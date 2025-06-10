@@ -40,7 +40,7 @@ def checkCrc32Value( crc ):
 def matchingBytes( crcToMatch, crcToChange ):
    checkCrc32Value( crcToMatch )
    checkCrc32Value( crcToChange )
-   
+
    bytesToMatch = crcfix( crcToMatch, crcToChange )
 
    crcBytes = []

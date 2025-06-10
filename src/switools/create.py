@@ -10,6 +10,7 @@ This module is responsible for packaging a SWIX file.
 import argparse
 import functools
 import hashlib
+import importlib
 import jsonschema
 import os
 import pyparsing
@@ -18,9 +19,10 @@ import subprocess
 import sys
 import tempfile
 import yaml
-from pkg_resources import resource_string
+from pathlib import Path
 
-manifestYamlName = 'manifest.yaml'
+
+MANIFEST_YAML = 'manifest.yaml'
 
 def dealWithExistingOutputFile( outputSwix, force ):
    '''
@@ -127,7 +129,7 @@ def verifyManifestYaml( filename, rpms ):
       version = manifest[ key ]
       assert version in supportedManifestVersions
 
-      schema = resource_string( __name__, f'static/schema{version}.json' )
+      schema = importlib.resources.files(__name__).joinpath(f'static/schema{version}.json').read_bytes()
       jsonschema.validate( manifest, yaml.safe_load( schema ) )
       versionStrings = manifest.get( 'version' )
       if versionStrings:
@@ -147,7 +149,7 @@ def verifyManifestYaml( filename, rpms ):
    except pyparsing.ParseException as e:
       sys.exit( f'Version strings validation error: {e}' )
 
-def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
+def create( outputSwix=None, rpms=None, manifestYaml=None, force=False ):
    '''
    Create a SWIX file named `outputSwix` given a list of RPMs.
    '''
@@ -162,7 +164,7 @@ def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
          # Copy manifest.yaml to temp dir; does two things:
          # - Ensures file is correctly named,
          # - Fails if file does not exist.
-         copy = os.path.join( tempDir, manifestYamlName )
+         copy = os.path.join( tempDir, MANIFEST_YAML )
          shutil.copyfile( manifestYaml, copy )
          verifyManifestYaml( copy, rpms )
          filesToZip.append( copy )
@@ -184,9 +186,9 @@ def parseCommandArgs( args ):
         help='An RPM to add to the SWIX' )
    add( '-f', '--force', action='store_true',
         help='Overwrite OUTFILE.swix if it already exists' )
-   add( '-i', '--info', metavar=manifestYamlName, action='store', type=str,
+   add( '-i', '--info', metavar=MANIFEST_YAML, action='store', type=str,
         dest='manifestYaml',
-        help=f'Location of {manifestYamlName} file to add metadata to SWIX' )
+        help=f'Location of {MANIFEST_YAML} file to add metadata to SWIX' )
    return parser.parse_args( args )
 
 def main():

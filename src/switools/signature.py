@@ -3,8 +3,6 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-from __future__ import print_function, absolute_import
-
 import os
 import argparse
 import base64
@@ -16,10 +14,11 @@ import subprocess
 import sys
 import zipfile
 from M2Crypto import BIO, EVP
+from pathlib import Path
 
-from . import crc32collision
-from . import verifyswi
-from . import signaturelib
+from switools import crc32collision
+from switools import verify
+from switools import signaturelib
 
 SIGN_VERSION = 1
 SWI_SIGNATURE_MAX_SIZE = 8192
@@ -326,7 +325,7 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
       outfile.write( swiSignature.getBytes() )
 
    # Verify the signature of the SWI
-   success = verifyswi.verifySwi( swi, rootCA=rootCaFile )
+   success = verify.verifySwi( swi, rootCA=rootCaFile )
    if success != SWI_SIGN_RESULT.SUCCESS:
       message = 'Error: Verification on the signed SWI/X failed.'
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_FAIL_VERIFICATION, message )

@@ -2,8 +2,6 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-from __future__ import absolute_import, division, print_function
-import os
 import subprocess
 import zipfile
 
@@ -11,7 +9,7 @@ SWI_SIG_FILE_NAME = 'swi-signature'
 SWIX_SIG_FILE_NAME = 'swix-signature'
 
 def getSigFileName( swiFile ):
-   if swiFile.lower().endswith( ".swix" ):
+   if swiFile.suffix ==  ".swix":
       return SWIX_SIG_FILE_NAME
    return SWI_SIG_FILE_NAME
 
@@ -34,11 +32,11 @@ def getOptimizations( swi, workDir ):
 
 def extractSwadapt( swi, workDir ):
    # zipfile.py does not honor file settings like +x, so use proven /usr/bin/zip
-   cmd = [ "unzip", "-o", "-qq", os.path.abspath( swi ), "swadapt" ]
+   cmd = [ "unzip", "-o", "-qq", swi.absolute(), "swadapt" ]
    return runCmd( cmd, workDir )
 
-def checkIsSwiFile( swi, workDir ):
-   if not os.path.isfile( swi ):
+def checkIsSwiFile( swi ):
+   if not swi.is_file():
       return False
    with zipfile.ZipFile( swi ) as zf:
       if 'version' not in zf.namelist():
@@ -46,5 +44,5 @@ def checkIsSwiFile( swi, workDir ):
       return True
 
 def adaptSwi( swi, optimImage, optim, workDir ):
-   cmd = [ "%s/swadapt" % workDir, os.path.abspath( swi ), optimImage, optim ]
+   cmd = [ "%s/swadapt" % workDir, swi.absolute(), optimImage, optim ]
    return runCmd( cmd, workDir )

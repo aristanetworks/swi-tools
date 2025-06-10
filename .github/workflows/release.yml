@@ -10,13 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
       - name: Set up Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          python-version-file: "pyproject.toml"
       - name: Build package
-        run: python setup.py sdist
+        run: uv build
       - name: Upload package
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

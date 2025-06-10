@@ -1,3 +1,3 @@
-include switools/ARISTA_ROOT_CA.crt
 include README.md
-include swixtools/static/schema*.json
+include src/switools/ARISTA_ROOT_CA.crt
+include src/switools/static/schema*.json

@@ -13,6 +13,7 @@ dependencies = [
     "m2crypto>=0.45.1",
     "pyparsing>=3.2.3",
     "pyyaml>=6.0.2",
+    "typer>=0.16.0",
 ]
 
 [project.scripts]

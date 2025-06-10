@@ -3,18 +3,20 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-import argparse
 import base64
 import binascii
 import importlib
 import os
 import sys
 import tempfile
+import typer
 import zipfile
 from M2Crypto import X509
 from pathlib import Path
+from typing import Annotated, Optional
 
 from switools import signaturelib
+from switools.callbacks import _path_exists_callback
 
 ROOT_CA_FILE_NAME = 'ARISTA_ROOT_CA.crt'
 ROOT_CA = importlib.resources.files(__name__).joinpath(ROOT_CA_FILE_NAME).read_bytes()
@@ -254,23 +256,18 @@ def verifyAllSwi( workDir, swi, rootCA=ROOT_CA_FILE_NAME ):
 
    return retCode
 
-def main():
-   helpText = "Verify Arista SWI image or SWIX extension"
-   parser = argparse.ArgumentParser( description=helpText,
-               formatter_class=argparse.ArgumentDefaultsHelpFormatter )
-   parser.add_argument( "swi_file", metavar="EOS.swi[x]", help="SWI/X file to verify" )
-   parser.add_argument( "--CAfile", default=ROOT_CA_FILE_NAME,
-                        help="Root certificate to verify against." )
+app = typer.Typer(add_completion=False)
 
-   args = parser.parse_args()
-   swi = args.swi_file
-   rootCA = args.CAfile
-
-   # swi images in swi format 3.0 can contain multiple sub-images that each have
-   # their own signature.
-   with tempfile.TemporaryDirectory( prefix="swi-verify-" ) as workDir:
-      retCode = verifyAllSwi( workDir, swi, rootCA )
-   exit( retCode )
+@app.command(name="verify")
+def _verify(
+   swi_file: Annotated[Path, typer.Argument(help="SWI/X file to verify.", callback=_path_exists_callback)],
+   ca_file: Annotated[Optional[Path], typer.Option("--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback)] = None,
+):
+   """
+   Verify Arista SWI image or SWIX extension.
+   """
+   with tempfile.TemporaryDirectory( prefix="swi-verify-" ) as work_dir:
+      verifyAllSwi( work_dir, swi_file, ca_file )
 
 if __name__ == "__main__":
-   main()
+   app()

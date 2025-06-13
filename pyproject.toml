@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "switools"
-version = "1.4"
+version = "2.0"
 description = "Tools for handling Arista SWI/X"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=45.0.4",
     "jsonschema>=4.24.0",
-    "m2crypto>=0.45.1",
     "pyparsing>=3.2.3",
     "pyyaml>=6.0.2",
     "typer>=0.16.0",

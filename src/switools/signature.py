@@ -13,7 +13,8 @@ import shutil
 import subprocess
 import sys
 import zipfile
-from M2Crypto import BIO, EVP
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, utils
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -292,12 +293,26 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
          message = 'Error: Signature not in base64.'
          raise SwiSignException( SWI_SIGN_RESULT.ERROR_INPUT_FILES, message )
    elif signingKeyFile:
+      with open(signingKeyFile, "rb") as key_file:
+         private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+         )
+      hashAlg = hashes.SHA256()
+      hasher = hashes.Hash( hashAlg )
       with open( swi, 'rb' ) as swiFile:
-         key = EVP.load_key( signingKeyFile )
-         key.reset_context( md='sha256' )
-         key.sign_init()
-         key.sign_update( swiFile.read() )
-         signature = base64.b64encode( key.sign_final() ).decode()
+         while True:
+            data = swiFile.read( 2**20 )
+            if not data:
+               break
+            hasher.update( data )
+         digest = hasher.finalize()
+         signature = private_key.sign(
+            digest,
+            padding.PKCS1v15(),
+            utils.Prehashed( hashAlg ),
+         )
+      signature = base64.b64encode( signature ).decode()
 
    # Process signing certificate
    with open( signingCertFile, 'rb' ) as certFile:

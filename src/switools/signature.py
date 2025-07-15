@@ -14,7 +14,7 @@ import subprocess
 import sys
 import zipfile
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, utils
+from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa, utils
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -83,6 +83,7 @@ class SWI_SIGN_RESULT:
    ERROR_SIGNING_SERVICE_FAILED = 8
    ERROR_SIGNATURE_INSERTION_FAILED = 9
    ERROR_SIGNATURE_EXTRACTION_FAILED = 10
+   ERROR_INVALID_KEY_TYPE = 12
    INTERNAL_ERROR = 11
 
 class SwiSignException( Exception ):
@@ -307,11 +308,20 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
                break
             hasher.update( data )
          digest = hasher.finalize()
-         signature = privateKey.sign(
-            digest,
-            padding.PKCS1v15(),
-            utils.Prehashed( hashAlg ),
-         )
+         if isinstance( privateKey, ec.EllipticCurvePrivateKey ):
+            signature = privateKey.sign(
+               digest,
+               ec.ECDSA( utils.Prehashed( hashAlg ) ),
+            )
+         elif isinstance( privateKey, rsa.RSAPrivateKey ):
+            signature = privateKey.sign(
+               digest,
+               padding.PKCS1v15(),
+               utils.Prehashed( hashAlg ),
+            )
+         else:
+            message = 'Error: Invalid Key Type.'
+            raise SwiSignException( SWI_SIGN_RESULT.ERROR_INVALID_KEY_TYPE, message )
       signature = base64.b64encode( signature ).decode()
 
    # Process signing certificate

@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa, utils
 from pathlib import Path
@@ -119,8 +120,12 @@ def generateHash( swi, hashAlgo, blockSize=65536 ):
    return sha256sum.hexdigest()
 
 def prepareSwiHandler( swi, outfile, size, force ):
-   hexdigest = prepareSwi( swi=swi, outfile=outfile, forceSign=force,
-                           size=size )
+   hexdigest = prepareSwi(
+                  swi=swi,
+                  outfile=outfile,
+                  forceSign=force,
+                  size=size,
+               )
    print( hexdigest )
 
 def prepareSwi( swi, outfile=None, forceSign=False, size=SWI_SIGNATURE_MAX_SIZE ):
@@ -368,13 +373,14 @@ def _prepare(
    """
    try:
       prepareSwiHandler( swi_file, outfile, size, force )
-   except ( IOError, BIO.BIOError, EVP.EVPError ) as e:
+   except ( IOError, ValueError, TypeError, RuntimeError, UnsupportedAlgorithm ) as e:
       print( e, file=sys.stderr )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
    except SwiSignException as e:
       print( e, file=sys.stderr )
       exit( e.code )
    exit( SWI_SIGN_RESULT.SUCCESS )
+
 
 @app.command( name="sign" )
 def _sign(
@@ -390,10 +396,9 @@ def _sign(
    """
    if signature_file and signing_key_file:
       raise typer.BadParameter( "Cannot specify both --signature and --key" )
-
    try:
       signSwiHandler( swi_file, certificate, root_certificate, signature_file, signing_key_file )
-   except ( IOError, BIO.BIOError, EVP.EVPError ) as e:
+   except ( IOError, ValueError, TypeError, RuntimeError, UnsupportedAlgorithm ) as e:
       print( e, file=sys.stderr )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
    except SwiSignException as e:

@@ -116,7 +116,7 @@ validatorFuncs = {
 def validateVersions( version, versionStrings ):
    return validatorFuncs[ version ]( versionStrings )
 
-def verifyManifestYaml( filename, rpms ):
+def verifyManifestYaml( filename ):
    '''
    Validate the contents of the manifest.yaml file.
    Currently, we just validate the structure.
@@ -168,7 +168,7 @@ def create( outputSwix=None, rpms=None, manifestYaml=None, force=False ):
          # - Fails if file does not exist.
          copy = os.path.join( tempDir, MANIFEST_YAML )
          shutil.copyfile( manifestYaml, copy )
-         verifyManifestYaml( copy, rpms )
+         verifyManifestYaml( copy )
          filesToZip.append( copy )
 
       # '-0' means 'no compression'.

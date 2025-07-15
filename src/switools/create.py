@@ -183,15 +183,15 @@ app = typer.Typer(add_completion=False)
 
 @app.command(name="create")
 def _create(
-   output_swix: Annotated[Path, typer.Argument(help="Name of output file.", callback=_parent_path_exists_callback)],
+   outputSwix: Annotated[Path, typer.Argument(help="Name of output file.", callback=_parent_path_exists_callback)],
    rpms: Annotated[List[Path], typer.Argument(help="An RPM to add to the SWIX.", callback=_path_exists_callback)],
-   manifest_yaml: Annotated[Optional[Path], typer.Option("--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=_path_exists_callback)] = None,
+   manifestYaml: Annotated[Optional[Path], typer.Option("--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=_path_exists_callback)] = None,
    force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite OUTFILE.swix if it already exists.")] = False,
 ):
    """
    swix create
    """
-   create(output_swix, rpms, manifest_yaml, force)
+   create(outputSwix, rpms, manifestYaml, force)
 
 if __name__ == "__main__":
    app()

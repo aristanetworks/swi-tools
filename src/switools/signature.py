@@ -332,7 +332,7 @@ app = typer.Typer(add_completion=False)
 
 @app.command(name="prepare")
 def _prepare(
-   swi_file: Annotated[Path, typer.Argument(help="Path of the SWI/X to prepare for signing.", callback=_path_exists_callback)],
+   swiFile: Annotated[Path, typer.Argument(help="Path of the SWI/X to prepare for signing.", callback=_path_exists_callback)],
    outfile: Annotated[Optional[Path], typer.Option("--outfile", help="Path to save SWI/X with null signature, if not replacing the input SWI/X.", callback=_path_exists_callback)] = None,
    size: Annotated[Optional[int], typer.Option("--size", help="Size of null signature to add.")] = SWI_SIGNATURE_MAX_SIZE,
    force: Annotated[Optional[bool], typer.Option("--force-sign", help="Force signing the SWI/X if it's already signed.")] = False,
@@ -342,7 +342,7 @@ def _prepare(
    Check SWI/X for existing signature, add a null signature.
    """
    try:
-      prepareSwiHandler(swi_file, outfile, size, force)
+      prepareSwiHandler(swiFile, outfile, size, force)
    except ( IOError, BIO.BIOError, EVP.EVPError ) as e:
       print( e, file=sys.stderr )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
@@ -353,21 +353,21 @@ def _prepare(
 
 @app.command(name="sign")
 def _sign(
-   swi_file: Annotated[Path, typer.Argument(help="Path of the SWI/X to sign.", callback=_path_exists_callback)],
+   swiFile: Annotated[Path, typer.Argument(help="Path of the SWI/X to sign.", callback=_path_exists_callback)],
    certificate: Annotated[Path, typer.Argument(help="Path of the signing certificate.", callback=_path_exists_callback)],
-   root_certificate: Annotated[Path, typer.Argument(help="Path of the root certificate of signing certificate to verify against.", callback=_path_exists_callback)],
-   signature_file: Annotated[Optional[Path], typer.Option("--signature", help="Path of base64-encoded SHA-256 signature file of EOS.swi or swix, signed by signing cerificate.", callback=_path_exists_callback)] = None,
-   signing_key_file: Annotated[Optional[Path], typer.Option("--key", help="Path of signing key, used to generate the signature.", callback=_path_exists_callback)] = None,
+   rootCertificate: Annotated[Path, typer.Argument(help="Path of the root certificate of signing certificate to verify against.", callback=_path_exists_callback)],
+   signatureFile: Annotated[Optional[Path], typer.Option("--signature", help="Path of base64-encoded SHA-256 signature file of EOS.swi or swix, signed by signing cerificate.", callback=_path_exists_callback)] = None,
+   signingKeyFile: Annotated[Optional[Path], typer.Option("--key", help="Path of signing key, used to generate the signature.", callback=_path_exists_callback)] = None,
 ):
    """
    Sign an Arista SWI/X.
    The SWI/X must have a null signature, which can be generated with "prepare" option.
    """
-   if signature_file and signing_key_file:
+   if signatureFile and signingKeyFile:
       raise typer.BadParameter("Cannot specify both --signature and --key")
 
    try:
-      signSwiHandler(swi_file, certificate, root_certificate, signature_file, signing_key_file)
+      signSwiHandler(swiFile, certificate, rootCertificate, signatureFile, signingKeyFile)
    except ( IOError, BIO.BIOError, EVP.EVPError ) as e:
       print( e, file=sys.stderr )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )

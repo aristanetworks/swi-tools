@@ -9,7 +9,7 @@ description = "Tools for handling Arista SWI/X"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "cryptography>=45.0.4",
+    "cryptography>=43.0.0",
     "jsonschema>=4.24.0",
     "pyparsing>=3.2.3",
     "pyyaml>=6.0.2",

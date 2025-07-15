@@ -3,16 +3,16 @@
 # that can be found in the LICENSE file.
 
 import base64
-import os
 import pyparsing
 import shutil
 import tempfile
 import unittest
 import zipfile
+from pathlib import Path
 
-from switools import verifyswi
-from switools.verifyswi import VERIFY_SWI_RESULT
-from swixtools.create import create, validatorFuncs
+from switools import verify
+from switools.verify import VERIFY_SWI_RESULT
+from switools.create import create, validatorFuncs
 
 from . import MockSigningServer
 
@@ -51,7 +51,7 @@ class TestVerifyBadSignature( unittest.TestCase ):
         create( self.test_swix, manifestYaml=None, rpms=self.rpms )
 
     def _testPath( self, filename ):
-       return os.path.join( self.test_dir, filename )
+       return Path( self.test_dir, filename )
 
     def tearDown( self ):
         shutil.rmtree( self.test_dir )
@@ -80,59 +80,59 @@ class TestVerifyBadSignature( unittest.TestCase ):
         return swixSigStr
 
     def test_no_signature( self ):
-        retCode = verifyswi.verifySwi( self.test_swix )
+        retCode = verify.verifySwi( self.test_swix )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_SIGNATURE_FILE )
 
     def test_not_a_zip_file( self ):
         testFile = self._writeFile( 'notaswix', 'stuff' )
-        retCode = verifyswi.verifySwi( testFile )
+        retCode = verify.verifySwi( testFile )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_NOT_A_SWI )
 
     def test_untrusted_signing_cert( self ):
         sig = self._makeSwixSignature( signingCert=BAD_SIGNING_CERT )
         self._addSigToSwix( sig )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swix, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH )
 
     def test_invalid_sig( self ):
         sig = self._makeSwixSignature()
         self._addSigToSwix( sig )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swix, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_VERIFICATION )
 
     def test_invalid_hash_algo( self ):
         sig = self._makeSwixSignature( hashAlgo='SHA-512' )
         self._addSigToSwix( sig )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swix, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_HASH_ALGORITHM )
 
     def test_malformed_signature( self ):
         self._addSigToSwix( 'bad sig' )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swix, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_SIGNATURE_FORMAT )
 
     def test_malformed_signature_key_value( self ):
         self._addSigToSwix( 'a:b\nc:d' )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swix, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_SIGNATURE_FORMAT )
 
     def test_malformed_signing_crt( self ):
         sig = self._makeSwixSignature( signingCert='bad cert' )
         self._addSigToSwix( sig )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swix, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_INVALID_SIGNING_CERT )
 
     def test_malformed_root_crt( self ):
         sig = self._makeSwixSignature()
         self._addSigToSwix( sig )
         rootCa = self._writeFile( 'root.crt', 'bad cert' )
-        retCode = verifyswi.verifySwi( self.test_swix, rootCA=rootCa )
+        retCode = verify.verifySwi( self.test_swix, rootCA=rootCa )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_INVALID_ROOT_CERT )
 
     def test_use_arista_default_root_ca( self ):
         sig = self._makeSwixSignature()
         self._addSigToSwix( sig )
-        retCode = verifyswi.verifySwi( self.test_swix )
+        retCode = verify.verifySwi( self.test_swix )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH )
 
 class TestVersionStringValidator( unittest.TestCase ):

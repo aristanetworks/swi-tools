@@ -2,8 +2,9 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-import M2Crypto
 import base64
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, utils
 
 MOCK_ROOT_CERT = """-----BEGIN CERTIFICATE-----
 MIIFmzCCA4OgAwIBAgIJAKZwnaRNxPajMA0GCSqGSIb3DQEBCwUAMGMxCzAJBgNV
@@ -121,10 +122,23 @@ rncHWUrKbM8RBjK39LSsHVv6QPXkfkTmo2c4i7HYgXz28+hICrzb3NVf2BRGFtCj
 N+tWXB01C+UnQziZ6tk5/RcxoHk8kS3lOlvd2D4RTGyJkEI1vmntMGwvmxh8pQ==
 -----END RSA PRIVATE KEY-----"""
 
-def getTestSignature( swiFile ):
-    with open( swiFile, 'rb' ) as swi:
-        key = M2Crypto.EVP.load_key_string( MOCK_SIGNING_KEY.encode() )
-        key.reset_context( md='sha256' )
-        key.sign_init()
-        key.sign_update( swi.read() )
-        return base64.b64encode( key.sign_final() ).decode()
+def getTestSignature( swi ):
+    privateKey = serialization.load_pem_private_key(
+        MOCK_SIGNING_KEY.encode(),
+        password=None,
+    )
+    hashAlg = hashes.SHA256()
+    hasher = hashes.Hash( hashAlg )
+    with open( swi, 'rb' ) as swiFile:
+        while True:
+            data = swiFile.read( 2**20 )
+            if not data:
+                break
+            hasher.update( data )
+        digest = hasher.finalize()
+        signature = privateKey.sign(
+            digest,
+            padding.PKCS1v15(),
+            utils.Prehashed( hashAlg ),
+        )
+    return base64.b64encode( signature ).decode()

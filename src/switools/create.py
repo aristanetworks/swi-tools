@@ -7,9 +7,9 @@
 This module is responsible for packaging a SWIX file.
 '''
 
-import argparse
 import functools
 import hashlib
+import importlib
 import jsonschema
 import os
 import pyparsing
@@ -17,10 +17,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import typer
 import yaml
-from pkg_resources import resource_string
+from pathlib import Path
+from typing import Annotated, List, Optional
 
-manifestYamlName = 'manifest.yaml'
+from switools.callbacks import _path_exists_callback, _parent_path_exists_callback
+
+MANIFEST_YAML = 'manifest.yaml'
 
 def dealWithExistingOutputFile( outputSwix, force ):
    '''
@@ -112,7 +116,7 @@ validatorFuncs = {
 def validateVersions( version, versionStrings ):
    return validatorFuncs[ version ]( versionStrings )
 
-def verifyManifestYaml( filename, rpms ):
+def verifyManifestYaml( filename ):
    '''
    Validate the contents of the manifest.yaml file.
    Currently, we just validate the structure.
@@ -127,7 +131,7 @@ def verifyManifestYaml( filename, rpms ):
       version = manifest[ key ]
       assert version in supportedManifestVersions
 
-      schema = resource_string( __name__, f'static/schema{version}.json' )
+      schema = importlib.resources.files(__name__).joinpath(f'static/schema{version}.json').read_bytes()
       jsonschema.validate( manifest, yaml.safe_load( schema ) )
       versionStrings = manifest.get( 'version' )
       if versionStrings:
@@ -147,7 +151,7 @@ def verifyManifestYaml( filename, rpms ):
    except pyparsing.ParseException as e:
       sys.exit( f'Version strings validation error: {e}' )
 
-def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
+def create( outputSwix=None, rpms=None, manifestYaml=None, force=False ):
    '''
    Create a SWIX file named `outputSwix` given a list of RPMs.
    '''
@@ -162,9 +166,9 @@ def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
          # Copy manifest.yaml to temp dir; does two things:
          # - Ensures file is correctly named,
          # - Fails if file does not exist.
-         copy = os.path.join( tempDir, manifestYamlName )
+         copy = os.path.join( tempDir, MANIFEST_YAML )
          shutil.copyfile( manifestYaml, copy )
-         verifyManifestYaml( copy, rpms )
+         verifyManifestYaml( copy )
          filesToZip.append( copy )
 
       # '-0' means 'no compression'.
@@ -175,23 +179,19 @@ def create( outputSwix=None, manifestYaml=None, rpms=None, force=False ):
    finally:
       shutil.rmtree( tempDir, ignore_errors=True )
 
-def parseCommandArgs( args ):
-   parser = argparse.ArgumentParser( prog='swix create' )
-   add = parser.add_argument
-   add( 'outputSwix', metavar='OUTFILE.swix',
-        help='Name of output file' )
-   add( 'rpms', metavar='PACKAGE.rpm', type=str, nargs='+',
-        help='An RPM to add to the SWIX' )
-   add( '-f', '--force', action='store_true',
-        help='Overwrite OUTFILE.swix if it already exists' )
-   add( '-i', '--info', metavar=manifestYamlName, action='store', type=str,
-        dest='manifestYaml',
-        help=f'Location of {manifestYamlName} file to add metadata to SWIX' )
-   return parser.parse_args( args )
+app = typer.Typer(add_completion=False)
 
-def main():
-   args = parseCommandArgs( sys.argv[1:] )
-   create( **args.__dict__ )
+@app.command(name="create")
+def _create(
+   outputSwix: Annotated[Path, typer.Argument(help="Name of output file.", callback=_parent_path_exists_callback)],
+   rpms: Annotated[List[Path], typer.Argument(help="An RPM to add to the SWIX.", callback=_path_exists_callback)],
+   manifestYaml: Annotated[Optional[Path], typer.Option("--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=_path_exists_callback)] = None,
+   force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite OUTFILE.swix if it already exists.")] = False,
+):
+   """
+   swix create
+   """
+   create(outputSwix, rpms, manifestYaml, force)
 
-if __name__ == '__main__':
-   main()
+if __name__ == "__main__":
+   app()

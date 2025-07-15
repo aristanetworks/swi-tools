@@ -3,22 +3,25 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-from __future__ import print_function, absolute_import
-
-import argparse
 import base64
 import binascii
+import importlib
 import os
 import sys
 import tempfile
-from pkg_resources import resource_string
+import typer
 import zipfile
-from M2Crypto import X509
+from cryptography import x509, exceptions as CryptoException
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec, rsa, utils, padding
+from pathlib import Path
+from typing import Annotated, Optional
 
-from . import signaturelib
+from switools import signaturelib
+from switools.callbacks import _path_exists_callback
 
 ROOT_CA_FILE_NAME = 'ARISTA_ROOT_CA.crt'
-ROOT_CA = resource_string( __name__, ROOT_CA_FILE_NAME )
+ROOT_CA = importlib.resources.files(__name__).joinpath(ROOT_CA_FILE_NAME).read_bytes()
 
 class SwiSignature:
    def __init__( self ):
@@ -129,30 +132,50 @@ def base64Decode( text ):
 def loadSigningCert( swiSignature ):
    # Read signing cert from memory and load it as an X509 cert object
    try:
-      signingCert = X509.load_cert_string( swiSignature.cert )
-      return signingCert
-   except X509.X509Error:
+      return x509.load_pem_x509_certificate( swiSignature.cert )
+   except ValueError:
       raise X509CertException( VERIFY_SWI_RESULT.ERROR_INVALID_SIGNING_CERT )
 
 def signingCertValid( signingCertX509, rootCAFile ):
    # Validate cert used to sign SWI with root CA
+   # Note: we cannot directly use verify_directly_issued_by. If root.subject
+   # and signing.issuer are not the same, but verify works, the function must
+   # return VERIFY_SWI_RESULT.SUCCESS. With verify_directly_issued_by it would
+   # return an error
    try:
-      rootCa = X509.load_cert_string( ROOT_CA )
+      rootCa = x509.load_pem_x509_certificate( ROOT_CA )
       if rootCAFile != ROOT_CA_FILE_NAME:
-         rootCa = X509.load_cert( rootCAFile )
-   except X509.X509Error:
+         with open(rootCAFile, "rb") as pems:
+            rootCa = x509.load_pem_x509_certificate( pems.read() )
+   except Exception:
       raise X509CertException( VERIFY_SWI_RESULT.ERROR_INVALID_ROOT_CERT )
-   result = signingCertX509.verify( rootCa.get_pubkey() )
-   if result == 1:
+   try:
+      rootKey = rootCa.public_key()
+      if isinstance( rootKey, ec.EllipticCurvePublicKey ):
+         rootKey.verify(
+            signingCertX509.signature,
+            signingCertX509.tbs_certificate_bytes,
+            signingCertX509.signature_algorithm_parameters
+         )
+      elif isinstance( rootKey, rsa.RSAPublicKey ):
+         rootKey.verify(
+            signingCertX509.signature,
+            signingCertX509.tbs_certificate_bytes,
+            signingCertX509.signature_algorithm_parameters,
+            signingCertX509.signature_hash_algorithm
+         )
+      else:
+         signingCertX509.verify_directly_issued_by( rootCa )
       return VERIFY_SWI_RESULT.SUCCESS
-   else:
+   except ( ValueError, TypeError, CryptoException.InvalidSignature,
+            CryptoException.UnsupportedAlgorithm ):
       return VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH
 
 def getHashAlgo( swiSignature ):
    hashAlgo = swiSignature.hashAlgo
    # For now, we always use SHA-256
-   if hashAlgo == 'SHA-256':
-      return 'sha256'
+   if hashAlgo in ["SHA-256", "sha256"]:
+      return hashes.SHA256()
    return None
 
 def swiSignatureValid( swiFile, swiSignature, signingCertX509 ):
@@ -163,10 +186,8 @@ def swiSignatureValid( swiFile, swiSignature, signingCertX509 ):
    # Verify the swi against the signature in swi-signature
    offset = 0
    BLOCK_SIZE = 65536
-   pubkey = signingCertX509.get_pubkey()
-   pubkey.reset_context( md=hashAlgo )
-   # Begin reading the data to verify
-   pubkey.verify_init()
+   pubkey = signingCertX509.public_key()
+   hasher = hashes.Hash( hashAlgo )
    # Read the swi file into the verification function, up to the swi signature file
    with open( swiFile, 'rb' ) as swi:
       while offset < swiSignature.offset:
@@ -174,23 +195,38 @@ def swiSignatureValid( swiFile, swiSignature, signingCertX509 ):
             numBytes = BLOCK_SIZE
          else:
             numBytes = swiSignature.offset - offset
-         pubkey.verify_update( swi.read( numBytes ) )
+         hasher.update( swi.read( numBytes ) )
          offset += numBytes
       # Now that we're at the swi-signature file, read zero's into the verification
       # function up to the size of the swi-signature file.
-      pubkey.verify_update( b'\000' * swiSignature.size )
+      hasher.update( b'\000' * swiSignature.size )
 
       # Now jump to the end of the swi-signature file and read the rest of the swi
       # file into the verification function
       swi.seek( swiSignature.size, os.SEEK_CUR )
       for block in iter( lambda: swi.read( BLOCK_SIZE ), b'' ):
-         pubkey.verify_update( block )
+         hasher.update( block )
    # After reading the swi file and skipping over the swi signature, check that the
    # data signed with pubkey is the same as signature in the swi-signature.
-   result = pubkey.verify_final( swiSignature.signature )
-   if result == 1:
-      return VERIFY_SWI_RESULT.SUCCESS
-   else:
+   try:
+      if isinstance( pubkey, ec.EllipticCurvePublicKey ):
+         pubkey.verify(
+            signature=swiSignature.signature,
+            data=hasher.finalize(),
+            signature_algorithm=ec.ECDSA( utils.Prehashed( hashAlgo ) )
+         )
+         return VERIFY_SWI_RESULT.SUCCESS
+      elif isinstance( pubkey, rsa.RSAPublicKey ):
+         pubkey.verify(
+            signature=swiSignature.signature,
+            data=hasher.finalize(),
+            padding=padding.PKCS1v15(),
+            algorithm=utils.Prehashed( hashAlgo )
+         )
+         return VERIFY_SWI_RESULT.SUCCESS
+      else:
+         return VERIFY_SWI_RESULT.ERROR_VERIFICATION
+   except CryptoException.InvalidSignature:
       return VERIFY_SWI_RESULT.ERROR_VERIFICATION
 
 def verifySwi( swi, rootCA=ROOT_CA_FILE_NAME ):
@@ -223,7 +259,7 @@ def verifyAllSwi( workDir, swi, rootCA=ROOT_CA_FILE_NAME ):
    subImageError = False
 
    # Make sure the image we got is a swi file
-   if not signaturelib.checkIsSwiFile( swi, workDir ):
+   if not signaturelib.checkIsSwiFile( swi ):
       print( "Error: '%s' does not look like an EOS image" % swi )
       return VERIFY_SWI_RESULT.ERROR_NOT_A_SWI
    optims = signaturelib.getOptimizations( swi, workDir )
@@ -255,23 +291,18 @@ def verifyAllSwi( workDir, swi, rootCA=ROOT_CA_FILE_NAME ):
 
    return retCode
 
-def main():
-   helpText = "Verify Arista SWI image or SWIX extension"
-   parser = argparse.ArgumentParser( description=helpText,
-               formatter_class=argparse.ArgumentDefaultsHelpFormatter )
-   parser.add_argument( "swi_file", metavar="EOS.swi[x]", help="SWI/X file to verify" )
-   parser.add_argument( "--CAfile", default=ROOT_CA_FILE_NAME,
-                        help="Root certificate to verify against." )
+app = typer.Typer(add_completion=False)
 
-   args = parser.parse_args()
-   swi = args.swi_file
-   rootCA = args.CAfile
-
-   # swi images in swi format 3.0 can contain multiple sub-images that each have
-   # their own signature.
-   with tempfile.TemporaryDirectory( prefix="swi-verify-" ) as workDir:
-      retCode = verifyAllSwi( workDir, swi, rootCA )
-   exit( retCode )
+@app.command(name="verify")
+def _verify(
+   swiFile: Annotated[Path, typer.Argument(help="SWI/X file to verify.", callback=_path_exists_callback)],
+   caFile: Annotated[Optional[Path], typer.Option("--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback)] = None,
+):
+   """
+   Verify Arista SWI image or SWIX extension.
+   """
+   with tempfile.TemporaryDirectory( prefix="swi-verify-" ) as work_dir:
+      verifyAllSwi( work_dir, swiFile, caFile )
 
 if __name__ == "__main__":
-   main()
+   app()

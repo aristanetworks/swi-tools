@@ -4,13 +4,13 @@
 
 import unittest
 import base64
-import os
 import shutil
 import tempfile
 import zipfile
+from pathlib import Path
 
-from switools import verifyswi
-from switools.verifyswi import VERIFY_SWI_RESULT
+from switools import verify
+from switools.verify import VERIFY_SWI_RESULT
 
 from . import MockSigningServer
 
@@ -42,7 +42,7 @@ class TestVerifyBadSignature( unittest.TestCase ):
         self.test_dir = tempfile.mkdtemp()
         self.root_crt = self._writeFile( 'root.crt', 
                                          MockSigningServer.MOCK_ROOT_CERT )
-        self.test_swi = os.path.join( self.test_dir, 'Test.swi' )
+        self.test_swi = Path( self.test_dir, 'Test.swi' )
         with zipfile.ZipFile( self.test_swi, 'w' ) as swi:
             swi.writestr( 'version', 'SWI_VERSION=4.21.0F' )
 
@@ -50,7 +50,7 @@ class TestVerifyBadSignature( unittest.TestCase ):
         shutil.rmtree( self.test_dir )
 
     def _writeFile( self, filename, contents ):
-        path = os.path.join( self.test_dir, filename )
+        path = Path( self.test_dir, filename )
         with open( path, 'w' ) as f:
             f.write( contents )
         return path
@@ -73,59 +73,59 @@ class TestVerifyBadSignature( unittest.TestCase ):
         return swiSigStr
 
     def test_no_signature( self ):
-        retCode = verifyswi.verifySwi( self.test_swi )
+        retCode = verify.verifySwi( self.test_swi )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_SIGNATURE_FILE )
 
     def test_not_a_zip_file( self ):
         testFile = self._writeFile( 'notaswi', 'stuff' )
-        retCode = verifyswi.verifySwi( testFile )
+        retCode = verify.verifySwi( testFile )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_NOT_A_SWI )
 
     def test_untrusted_signing_cert( self ):
         sig = self._makeSwiSignature( signingCert=BAD_SIGNING_CERT )
         self._addSigToSwi( sig )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swi, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH )
 
     def test_invalid_sig( self ):
         sig = self._makeSwiSignature()
         self._addSigToSwi( sig )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swi, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_VERIFICATION )
 
     def test_invalid_hash_algo( self ):
         sig = self._makeSwiSignature( hashAlgo='SHA-512' )
         self._addSigToSwi( sig )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swi, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_HASH_ALGORITHM )
 
     def test_malformed_signature( self ):
         self._addSigToSwi( 'bad sig' )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swi, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_SIGNATURE_FORMAT )
 
     def test_malformed_signature_key_value( self ):
         self._addSigToSwi( 'a:b\nc:d' )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swi, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_SIGNATURE_FORMAT )
 
     def test_malformed_signing_crt( self ):
         sig = self._makeSwiSignature( signingCert='bad cert' )
         self._addSigToSwi( sig )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=self.root_crt )
+        retCode = verify.verifySwi( self.test_swi, rootCA=self.root_crt )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_INVALID_SIGNING_CERT )
 
     def test_malformed_root_crt( self ):
         sig = self._makeSwiSignature()
         self._addSigToSwi( sig )
         rootCa = self._writeFile( 'root.crt', 'bad cert' )
-        retCode = verifyswi.verifySwi( self.test_swi, rootCA=rootCa )
+        retCode = verify.verifySwi( self.test_swi, rootCA=rootCa )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_INVALID_ROOT_CERT )
 
     def test_use_arista_default_root_ca( self ):
         sig = self._makeSwiSignature()
         self._addSigToSwi( sig )
-        retCode = verifyswi.verifySwi( self.test_swi )
+        retCode = verify.verifySwi( self.test_swi )
         self.assertEqual( retCode, VERIFY_SWI_RESULT.ERROR_CERT_MISMATCH ) 
 
 if __name__ == '__main__':

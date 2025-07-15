@@ -3,23 +3,26 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-from __future__ import print_function, absolute_import
-
 import os
-import argparse
 import base64
 import binascii
 import hashlib
 import tempfile
+import typer
 import shutil
 import subprocess
 import sys
 import zipfile
-from M2Crypto import BIO, EVP
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa, utils
+from pathlib import Path
+from typing import Annotated, Optional
 
-from . import crc32collision
-from . import verifyswi
-from . import signaturelib
+from switools import crc32collision
+from switools import verify
+from switools import signaturelib
+from switools.callbacks import _path_exists_callback
 
 SIGN_VERSION = 1
 SWI_SIGNATURE_MAX_SIZE = 8192
@@ -82,6 +85,7 @@ class SWI_SIGN_RESULT:
    ERROR_SIGNATURE_INSERTION_FAILED = 9
    ERROR_SIGNATURE_EXTRACTION_FAILED = 10
    INTERNAL_ERROR = 11
+   ERROR_INVALID_KEY_TYPE = 12
 
 class SwiSignException( Exception ):
    def __init__( self, code, message ):
@@ -115,9 +119,13 @@ def generateHash( swi, hashAlgo, blockSize=65536 ):
          sha256sum.update( block )
    return sha256sum.hexdigest()
 
-def prepareSwiHandler( args ):
-   hexdigest = prepareSwi( swi=args.swi, outfile=args.outfile, forceSign=args.force_sign,
-                           size=args.size )
+def prepareSwiHandler( swi, outfile, size, force ):
+   hexdigest = prepareSwi(
+                  swi=swi,
+                  outfile=outfile,
+                  forceSign=force,
+                  size=size,
+               )
    print( hexdigest )
 
 def prepareSwi( swi, outfile=None, forceSign=False, size=SWI_SIGNATURE_MAX_SIZE ):
@@ -152,12 +160,7 @@ def prepareSwi( swi, outfile=None, forceSign=False, size=SWI_SIGNATURE_MAX_SIZE 
    nullSwiHash = generateHash( swiFile, 'SHA-256' )
    return nullSwiHash
 
-def signSwiHandler( args ):
-   swi = args.swi
-   signingCertFile = args.certificate
-   rootCaFile = args.CAfile
-   signatureFile = args.signature
-   signingKeyFile = args.key
+def signSwiHandler( swi, signingCertFile, rootCaFile, signatureFile, signingKeyFile ):
    with tempfile.TemporaryDirectory( prefix="swi-signature-" ) as workDir:
       signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile, signingKeyFile )
       print( 'SWI/X file %s successfully signed and verified.' % swi )
@@ -206,7 +209,7 @@ def signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile=None, s
    # handling that extraction. swadapt is found inside the image itself and is a
    # statically linked i386 binary.
    # Make sure the image we got is a swi file
-   if not signaturelib.checkIsSwiFile( swi, workDir ):
+   if not signaturelib.checkIsSwiFile( swi ):
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_NOT_A_SWI,
                               "Error: '%s' does not look like an EOS image" % swi )
 
@@ -296,12 +299,35 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
          message = 'Error: Signature not in base64.'
          raise SwiSignException( SWI_SIGN_RESULT.ERROR_INPUT_FILES, message )
    elif signingKeyFile:
+      with open(signingKeyFile, "rb") as keyFile:
+         privateKey = serialization.load_pem_private_key(
+            keyFile.read(),
+            password=None,
+         )
+      hashAlg = hashes.SHA256()
+      hasher = hashes.Hash( hashAlg )
       with open( swi, 'rb' ) as swiFile:
-         key = EVP.load_key( signingKeyFile )
-         key.reset_context( md='sha256' )
-         key.sign_init()
-         key.sign_update( swiFile.read() )
-         signature = base64.b64encode( key.sign_final() ).decode()
+         while True:
+            data = swiFile.read( 2**20 )
+            if not data:
+               break
+            hasher.update( data )
+         digest = hasher.finalize()
+         if isinstance( privateKey, ec.EllipticCurvePrivateKey ):
+            signature = privateKey.sign(
+               digest,
+               ec.ECDSA( utils.Prehashed( hashAlg ) ),
+            )
+         elif isinstance( privateKey, rsa.RSAPrivateKey ):
+            signature = privateKey.sign(
+               digest,
+               padding.PKCS1v15(),
+               utils.Prehashed( hashAlg ),
+            )
+         else:
+            message = 'Error: Invalid Key Type.'
+            raise SwiSignException( SWI_SIGN_RESULT.ERROR_INVALID_KEY_TYPE, message )
+      signature = base64.b64encode( signature ).decode()
 
    # Process signing certificate
    with open( signingCertFile, 'rb' ) as certFile:
@@ -326,65 +352,59 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
       outfile.write( swiSignature.getBytes() )
 
    # Verify the signature of the SWI
-   success = verifyswi.verifySwi( swi, rootCA=rootCaFile )
+   success = verify.verifySwi( swi, rootCA=rootCaFile )
    if success != SWI_SIGN_RESULT.SUCCESS:
       message = 'Error: Verification on the signed SWI/X failed.'
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_FAIL_VERIFICATION, message )
 
-def main():
-   helpText = "Sign an Arista SWI or SWIX."
-   parser = argparse.ArgumentParser( description=helpText )
 
-   # Add options for preparing and signing the SWI
-   subparsers = parser.add_subparsers( help="Operations to perform on SWI/X file" )
-   parser_prepare = subparsers.add_parser( 'prepare',
-                     help='Check SWI/X for existing signature, add a null signature' )
-   parser_sign = subparsers.add_parser( 'sign',
-                     help='Sign the SWI/X. The SWI/X must have a null signature, which'
-                          ' can be generated with "prepare" option.' )
+app = typer.Typer(add_completion=False)
 
-   # Options for preparing the SWI
-   parser_prepare.add_argument( "swi", metavar="EOS.swi[x]",
-                        help="Path of the SWI/X to prepare for signing" )
-   parser_prepare.add_argument( "--force-sign",
-                        help="Force signing the SWI/X if it's already signed",
-                        action="store_true")
-   parser_prepare.add_argument( "--outfile",
-                        help="Path to save SWI/X with null signature, if not"
-                             " replacing the input SWI/X" )
-   parser_prepare.add_argument( "--size", type=int, default=SWI_SIGNATURE_MAX_SIZE,
-                        help="Size of null signature to add (default 8192 bytes)" )
-   parser_prepare.set_defaults( func=prepareSwiHandler )
-
-   # Options for signing the SWI
-   parser_sign.add_argument( "swi", metavar="EOS.swi[x]",
-                        help="Path of the SWI/X to sign." )
-   parser_sign.add_argument( "certificate", metavar="SIGNINGCERT.crt",
-                        help="Path of signing certificate." )
-   parser_sign.add_argument( "CAfile", metavar="ROOTCERT.crt",
-                        help="Root certificate of signing certificate to verify against" )
-   signingMethod = parser_sign.add_mutually_exclusive_group( required=False )
-   signingMethod.add_argument( "--signature", metavar="SIGNATURE.txt",
-                        help="Path of base64-encoded SHA-256 signature file of"
-                             " EOS.swi or swix, signed by signing cerificate." )
-   signingMethod.add_argument( "--key", metavar="SIGNINGKEY.key",
-                        help="Path of signing key, used to generate the signature" )
-
-   parser_sign.set_defaults( func=signSwiHandler )
-
-   args = parser.parse_args()
+@app.command(name="prepare")
+def _prepare(
+   swiFile: Annotated[Path, typer.Argument(help="Path of the SWI/X to prepare for signing.", callback=_path_exists_callback)],
+   outfile: Annotated[Optional[Path], typer.Option("--outfile", help="Path to save SWI/X with null signature, if not replacing the input SWI/X.", callback=_path_exists_callback)] = None,
+   size: Annotated[Optional[int], typer.Option("--size", help="Size of null signature to add.")] = SWI_SIGNATURE_MAX_SIZE,
+   force: Annotated[Optional[bool], typer.Option("--force-sign", help="Force signing the SWI/X if it's already signed.")] = False,
+):
+   """
+   Prepare an Arista SWI/X for signing.
+   Check SWI/X for existing signature, add a null signature.
+   """
    try:
-      args.func( args )
-   except ( IOError, BIO.BIOError, EVP.EVPError ) as e:
+      prepareSwiHandler(swiFile, outfile, size, force)
+   except ( IOError, ValueError, TypeError, RuntimeError, UnsupportedAlgorithm ) as e:
       print( e, file=sys.stderr )
       exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
    except SwiSignException as e:
       print( e, file=sys.stderr )
       exit( e.code )
-   except AttributeError as e: # When main is called with no op.
-      sys.exit( parser.format_help() )
-
    exit( SWI_SIGN_RESULT.SUCCESS )
 
-if __name__ == '__main__':
-   main()
+@app.command(name="sign")
+def _sign(
+   swiFile: Annotated[Path, typer.Argument(help="Path of the SWI/X to sign.", callback=_path_exists_callback)],
+   certificate: Annotated[Path, typer.Argument(help="Path of the signing certificate.", callback=_path_exists_callback)],
+   rootCertificate: Annotated[Path, typer.Argument(help="Path of the root certificate of signing certificate to verify against.", callback=_path_exists_callback)],
+   signatureFile: Annotated[Optional[Path], typer.Option("--signature", help="Path of base64-encoded SHA-256 signature file of EOS.swi or swix, signed by signing cerificate.", callback=_path_exists_callback)] = None,
+   signingKeyFile: Annotated[Optional[Path], typer.Option("--key", help="Path of signing key, used to generate the signature.", callback=_path_exists_callback)] = None,
+):
+   """
+   Sign an Arista SWI/X.
+   The SWI/X must have a null signature, which can be generated with "prepare" option.
+   """
+   if signatureFile and signingKeyFile:
+      raise typer.BadParameter("Cannot specify both --signature and --key")
+
+   try:
+      signSwiHandler(swiFile, certificate, rootCertificate, signatureFile, signingKeyFile)
+   except ( IOError, ValueError, TypeError, RuntimeError, UnsupportedAlgorithm ) as e:
+      print( e, file=sys.stderr )
+      exit( SWI_SIGN_RESULT.ERROR_INPUT_FILES )
+   except SwiSignException as e:
+      print( e, file=sys.stderr )
+      exit( e.code )
+   exit( SWI_SIGN_RESULT.SUCCESS )
+
+if __name__ == "__main__":
+   app()

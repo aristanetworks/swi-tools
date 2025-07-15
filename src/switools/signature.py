@@ -293,9 +293,9 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
          message = 'Error: Signature not in base64.'
          raise SwiSignException( SWI_SIGN_RESULT.ERROR_INPUT_FILES, message )
    elif signingKeyFile:
-      with open(signingKeyFile, "rb") as key_file:
-         private_key = serialization.load_pem_private_key(
-            key_file.read(),
+      with open(signingKeyFile, "rb") as keyFile:
+         privateKey = serialization.load_pem_private_key(
+            keyFile.read(),
             password=None,
          )
       hashAlg = hashes.SHA256()
@@ -307,7 +307,7 @@ def signSwi( swi, signingCertFile, rootCaFile, signatureFile=None, signingKeyFil
                break
             hasher.update( data )
          digest = hasher.finalize()
-         signature = private_key.sign(
+         signature = privateKey.sign(
             digest,
             padding.PKCS1v15(),
             utils.Prehashed( hashAlg ),

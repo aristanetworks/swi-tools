@@ -126,7 +126,7 @@ def getTestSignature( swi ):
     privateKey = serialization.load_pem_private_key(
         MOCK_SIGNING_KEY.encode(),
         password=None,
-        )
+    )
     hashAlg = hashes.SHA256()
     hasher = hashes.Hash( hashAlg )
     with open( swi, 'rb' ) as swiFile:
@@ -140,19 +140,5 @@ def getTestSignature( swi ):
             digest,
             padding.PKCS1v15(),
             utils.Prehashed( hashAlg ),
-            )
-    return base64.b64encode( signature ).decode()
-    privateKey = serialization.load_pem_private_key(
-        MOCK_SIGNING_KEY.encode(),
-        password=None,
-    )
-    with open( swi, 'rb' ) as swiFile:
-        signature = privateKey.sign(
-            swiFile.read(),
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hashes.SHA256()
         )
     return base64.b64encode( signature ).decode()

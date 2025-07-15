@@ -123,7 +123,7 @@ N+tWXB01C+UnQziZ6tk5/RcxoHk8kS3lOlvd2D4RTGyJkEI1vmntMGwvmxh8pQ==
 -----END RSA PRIVATE KEY-----"""
 
 def getTestSignature( swi ):
-    private_key = serialization.load_pem_private_key(
+    privateKey = serialization.load_pem_private_key(
         MOCK_SIGNING_KEY.encode(),
         password=None,
         )
@@ -136,18 +136,18 @@ def getTestSignature( swi ):
                 break
             hasher.update( data )
         digest = hasher.finalize()
-        signature = private_key.sign(
+        signature = privateKey.sign(
             digest,
             padding.PKCS1v15(),
             utils.Prehashed( hashAlg ),
             )
     return base64.b64encode( signature ).decode()
-    private_key = serialization.load_pem_private_key(
+    privateKey = serialization.load_pem_private_key(
         MOCK_SIGNING_KEY.encode(),
         password=None,
     )
     with open( swi, 'rb' ) as swiFile:
-        signature = private_key.sign(
+        signature = privateKey.sign(
             swiFile.read(),
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),

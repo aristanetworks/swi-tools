@@ -120,7 +120,7 @@ Usage: swi-tools prepare [OPTIONS] SWI_FILE
 
 
 ╭─ Arguments ────────────────────────────────────────────────────────────────────────────────────╮
-│ *    swi_file      PATH  Path of the SWI/X to prepare for signing. [default: None] [required]  │
+│ *    swiFile       PATH  Path of the SWI/X to prepare for signing. [default: None] [required]  │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ──────────────────────────────────────────────────────────────────────────────────────╮
 │ --outfile           PATH     Path to save SWI/X with null signature, if not replacing the      │
@@ -163,7 +163,7 @@ $ swi-tools sign --help
 
 
 ╭─ Arguments ────────────────────────────────────────────────────────────────────────────────────╮
-│ *    swi_file            PATH  Path of the SWI/X to sign. [default: None] [required]           │
+│ *    swiFile             PATH  Path of the SWI/X to sign. [default: None] [required]           │
 │ *    certificate         PATH  Path of the signing certificate. [default: None] [required]     │
 │ *    root_certificate    PATH  Path of the root certificate of signing certificate to verify   │
 │                                against.                                                        │
@@ -254,7 +254,7 @@ $ swi-tools verify --help
 
 
 ╭─ Arguments ────────────────────────────────────────────────────────────────────────────────────╮
-│ *    swi_file      PATH  SWI/X file to verify. [default: None] [required]                      │
+│ *    swiFile       PATH  SWI/X file to verify. [default: None] [required]                      │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ──────────────────────────────────────────────────────────────────────────────────────╮
 │ --CAfile        PATH  Root certificate to verify against. [default: None]                      │

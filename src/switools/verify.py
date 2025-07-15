@@ -295,14 +295,14 @@ app = typer.Typer(add_completion=False)
 
 @app.command(name="verify")
 def _verify(
-   swi_file: Annotated[Path, typer.Argument(help="SWI/X file to verify.", callback=_path_exists_callback)],
-   ca_file: Annotated[Optional[Path], typer.Option("--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback)] = None,
+   swiFile: Annotated[Path, typer.Argument(help="SWI/X file to verify.", callback=_path_exists_callback)],
+   caFile: Annotated[Optional[Path], typer.Option("--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback)] = None,
 ):
    """
    Verify Arista SWI image or SWIX extension.
    """
    with tempfile.TemporaryDirectory( prefix="swi-verify-" ) as work_dir:
-      verifyAllSwi( work_dir, swi_file, ca_file )
+      verifyAllSwi( work_dir, swiFile, caFile )
 
 if __name__ == "__main__":
    app()

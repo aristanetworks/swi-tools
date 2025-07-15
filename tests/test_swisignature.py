@@ -106,8 +106,8 @@ class TestSwiSignature( unittest.TestCase ):
 
     def test_sign_with_signature( self ):
         signature.prepareSwi( self.test_swi )
-        mock_signature = MockSigningServer.getTestSignature( self.test_swi )
-        sigFile = self._writeFile( 'signature.sig', mock_signature )
+        mockSignature = MockSigningServer.getTestSignature( self.test_swi )
+        sigFile = self._writeFile( 'signature.sig', mockSignature )
         signature.signSwi( self.test_swi, self.signing_crt, self.root_crt,
                               signatureFile=sigFile )
         self._verifySignature( self.test_swi )

@@ -223,7 +223,7 @@ def verifyAllSwi( workDir, swi, rootCA=ROOT_CA_FILE_NAME ):
    subImageError = False
 
    # Make sure the image we got is a swi file
-   if not signaturelib.checkIsSwiFile( swi, workDir ):
+   if not signaturelib.checkIsSwiFile( swi ):
       print( "Error: '%s' does not look like an EOS image" % swi )
       return VERIFY_SWI_RESULT.ERROR_NOT_A_SWI
    optims = signaturelib.getOptimizations( swi, workDir )

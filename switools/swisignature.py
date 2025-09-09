@@ -206,7 +206,7 @@ def signSwiAll( workDir, swi, signingCertFile, rootCaFile, signatureFile=None, s
    # handling that extraction. swadapt is found inside the image itself and is a
    # statically linked i386 binary.
    # Make sure the image we got is a swi file
-   if not signaturelib.checkIsSwiFile( swi, workDir ):
+   if not signaturelib.checkIsSwiFile( swi ):
       raise SwiSignException( SWI_SIGN_RESULT.ERROR_NOT_A_SWI,
                               "Error: '%s' does not look like an EOS image" % swi )
 

@@ -62,8 +62,9 @@ class TestSwiSignature( unittest.TestCase ):
         return sha256sum.hexdigest()
 
     def _verifySignature( self, filename ):
-        retCode = verifyswi.verifySwi( filename, rootCA=self.root_crt )
-        self.assertEqual( retCode, 0 )
+        with tempfile.TemporaryDirectory( prefix="swix-verify-" ) as workDir:
+            retCode = verifyswi.verifyAllSwi( workDir, filename, self.root_crt )
+            self.assertEqual( retCode, 0 )
 
     def test_prepare_return_hexdigest( self ):
         hexdigest = swisignature.prepareSwi( self.test_swi )

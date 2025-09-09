@@ -37,13 +37,13 @@ def extractSwadapt( swi, workDir ):
    cmd = [ "unzip", "-o", "-qq", os.path.abspath( swi ), "swadapt" ]
    return runCmd( cmd, workDir )
 
-def checkIsSwiFile( swi, workDir ):
+def checkIsSwiFile( swi ):
    if not os.path.isfile( swi ):
       return False
+   fileExt = os.path.splitext( swi )[ -1 ]
+   versionFileName = 'manifest.txt' if fileExt == '.swix' else 'version'
    with zipfile.ZipFile( swi ) as zf:
-      if 'version' not in zf.namelist():
-         return False
-      return True
+      return versionFileName in zf.namelist()
 
 def adaptSwi( swi, optimImage, optim, workDir ):
    cmd = [ "%s/swadapt" % workDir, os.path.abspath( swi ), optimImage, optim ]

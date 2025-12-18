@@ -174,7 +174,7 @@ def signingCertValid( signingCertX509, rootCAFile ):
 def getHashAlgo( swiSignature ):
    hashAlgo = swiSignature.hashAlgo
    # For now, we always use SHA-256
-   if hashAlgo in ["SHA-256", "sha256"]:
+   if hashAlgo == "SHA-256":
       return hashes.SHA256()
    return None
 

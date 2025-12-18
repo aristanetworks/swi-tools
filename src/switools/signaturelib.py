@@ -38,7 +38,7 @@ def extractSwadapt( swi, workDir ):
 def checkIsSwiFile( swi ):
    if not swi.is_file():
       return False
-   fileExt = os.path.splitext( swi )[ -1 ]
+   fileExt = swi.suffix
    versionFileName = 'manifest.txt' if fileExt == '.swix' else 'version'
    with zipfile.ZipFile( swi ) as zf:
       return versionFileName in zf.namelist()

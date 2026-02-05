@@ -1,9 +1,9 @@
-# ------------------------------------------------------------------------------
-#  Arista Networks, Inc. Confidential and Proprietary.
-#  Copyright (c) 2025 Arista Networks, Inc. All rights reserved.
+# Copyright (c) 2026 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the LICENSE file.
 # ------------------------------------------------------------------------------
 #  Maintainers:
-#    creid@arista.com
+#    abio@arista.com
 #
 #  Description:
 #
@@ -24,8 +24,7 @@ def main():
     _formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s:%(lineno)d - %(message)s")
     _channel.setFormatter(_formatter)
     logging.basicConfig(level=logging.WARNING, handlers=[_channel])
-    cli.app(prog_name=__app_name__)
-
+    cli.app( prog_name=__app_name__ )
 
 if __name__ == "__main__":
     main()

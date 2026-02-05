@@ -256,12 +256,12 @@ def verifyAllSwi( workDir, swi, rootCA=ROOT_CA_FILE_NAME ):
 
    return retCode
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer( add_completion=False, context_settings={"help_option_names": [ "-h", "--help" ]} )
 
-@app.command(name="verify")
+@app.command( name="verify" )
 def _verify(
-   swi_file: Annotated[Path, typer.Argument(help="SWI/X file to verify.", callback=_path_exists_callback)],
-   ca_file: Annotated[Optional[Path], typer.Option("--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback)] = None,
+   swi_file: Annotated[ Path, typer.Argument( help="SWI/X file to verify.", callback=_path_exists_callback ) ],
+   ca_file: Annotated[ Optional[ Path ], typer.Option( "--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback ) ] = None,
 ):
    """
    Verify Arista SWI image or SWIX extension.

@@ -54,12 +54,12 @@ def matchingBytes( crcToMatch, crcToChange ):
       crcBytes.append( byte )
    return crcBytes
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer( add_completion=False, context_settings={"help_option_names": [ "-h", "--help" ]} )
 
-@app.command(name="collision")
+@app.command( name="collision" )
 def _collision(
-   file_to_match: Annotated[Path, typer.Argument(help="File whose CRC32 is to be matched.", callback=_path_exists_callback)] = None,
-   file_to_change: Annotated[Path, typer.Argument(help="File to produce a new CRC32 that matches the first.", callback=_path_exists_callback)] = None,
+   file_to_match: Annotated[ Path, typer.Argument( help="File whose CRC32 is to be matched.", callback=_path_exists_callback ) ],
+   file_to_change: Annotated[ Path, typer.Argument( help="File to produce a new CRC32 that matches the first.", callback=_path_exists_callback ) ],
 ):
    """
    Generate CRC32 collision for two files.

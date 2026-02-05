@@ -1,10 +1,10 @@
-# ------------------------------------------------------------------------------
-#  Arista Networks, Inc. Confidential and Proprietary.
-#  Copyright (c) 2025 Arista Networks, Inc. All rights reserved.
+# Copyright (c) 2026 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the LICENSE file.
 # ------------------------------------------------------------------------------
 #  Maintainers:
 #    alejandros@arista.com
-#    creid@arista.com
+#    abio@arista.com
 #
 #  Description:
 #

@@ -179,19 +179,19 @@ def create( outputSwix=None, rpms=None, manifestYaml=None, force=False ):
    finally:
       shutil.rmtree( tempDir, ignore_errors=True )
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer( add_completion=False, context_settings={"help_option_names": [ "-h", "--help" ]} )
 
-@app.command(name="create")
+@app.command( name="create" )
 def _create(
-   output_swix: Annotated[Path, typer.Argument(help="Name of output file.", callback=_parent_path_exists_callback)],
-   rpms: Annotated[List[Path], typer.Argument(help="An RPM to add to the SWIX.", callback=_path_exists_callback)],
-   manifest_yaml: Annotated[Optional[Path], typer.Option("--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=_path_exists_callback)] = None,
-   force: Annotated[Optional[bool], typer.Option("--force", "-f", help="Overwrite OUTFILE.swix if it already exists.")] = False,
+      output_swix: Annotated[ Path, typer.Argument( help="Name of output file.", callback=_parent_path_exists_callback ) ],
+      rpms: Annotated[ List[ Path ], typer.Argument( help="An RPM to add to the SWIX.", callback=_path_exists_callback ) ],
+      manifest_yaml: Annotated[ Optional[ Path ], typer.Option( "--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=_path_exists_callback ) ] = None,
+      force: Annotated[ Optional[ bool ], typer.Option( "--force", "-f", help="Overwrite OUTFILE.swix if it already exists." ) ] = False,
 ):
    """
    swix create
    """
-   create(output_swix, rpms, manifest_yaml, force)
+   create( output_swix, rpms, manifest_yaml, force )
 
 if __name__ == "__main__":
    app()

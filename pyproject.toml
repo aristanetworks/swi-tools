@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "switools"
-version = "1.4"
+version = "1.5"
 description = "Tools for handling Arista SWI/X"
 readme = "README.md"
 requires-python = ">=3.12"

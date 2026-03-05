@@ -3,22 +3,21 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
-from __future__ import print_function, absolute_import
-
 import argparse
 import base64
 import binascii
+import importlib
 import os
 import sys
 import tempfile
-from pkg_resources import resource_string
 import zipfile
 from M2Crypto import X509
+from pathlib import Path
 
-from . import signaturelib
+from switools import signaturelib
 
 ROOT_CA_FILE_NAME = 'ARISTA_ROOT_CA.crt'
-ROOT_CA = resource_string( __name__, ROOT_CA_FILE_NAME )
+ROOT_CA = importlib.resources.files(__name__).joinpath(ROOT_CA_FILE_NAME).read_bytes()
 
 class SwiSignature:
    def __init__( self ):

@@ -20,14 +20,17 @@ Alternatively:
 ```
 git clone https://github.com/aristanetworks/swi-tools.git
 cd swi-tools
-python3 setup.py install
+pip3 install .
 ```
 ### Dependencies
 0. Python3. For a version that works with python2, use the version 1.0 release.
+0. [uv](https://docs.astral.sh/uv/) - Python package and project manager.
 1. [Zip](http://infozip.sourceforge.net/) - Used in the `swi-signature` script to remove a signature from the SWI/X if you want to re-sign it, this comes preinstalled on many operating systems.
 2. [M2Crypto](https://pypi.org/project/M2Crypto/) - installed automatically with the setup script.
-3. [PyYAML](https://pyyaml.org) - Used to read the manifest.yaml, if added, when creating a SWIX.
-4. [jsonschema](http://json-schema.org) - Used to verify the manifest.yaml, if added, when creating a SWIX.
+3. [jsonschema](http://json-schema.org) - Used to verify the manifest.yaml, if added, when creating a SWIX.
+4. [pyparsing](https://pypi.org/project/pyparsing/)
+5. [PyYAML](https://pyyaml.org) - Used to read the manifest.yaml, if added, when creating a SWIX.
+6. [typer](https://pypi.org/project/typer/) - CLI library.
 
 ## Creating a SWIX
 Creating a SWIX is a straightforward process involving the `swix-create` command.
@@ -271,10 +274,10 @@ Above's output was for a 4.27.2+ image (which has multiple contained images)
 
 ## Testing
 To run unit tests:
-``` 
-python3 setup.py test 
+```
+uv run pytest
 ```
 End-to-end tests after install:
-``` 
-./tests/swim_test.sh 
+```
+./tests/swim_test.sh
 ```

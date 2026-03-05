@@ -32,9 +32,9 @@ def version(value: bool) -> None:
 def verbosity(param: typer.CallbackParam, value: bool) -> None:
     logger.debug(f"callback.verbosity: {value}")
     if value:
-        if param.name == "verbose" and logger.parent.level > logging.INFO:
+        if param.name == "verbose" and logger.parent is not None and logger.parent.level > logging.INFO:
             logger.parent.setLevel(logging.INFO)
-        if param.name == "very_verbose" and logger.parent.level > logging.DEBUG:
+        if param.name == "very_verbose" and logger.parent is not None and logger.parent.level > logging.DEBUG:
             logger.parent.setLevel(logging.DEBUG)
 
 

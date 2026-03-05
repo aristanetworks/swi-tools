@@ -30,6 +30,11 @@ packages = [
     "src/switools",
 ]
 
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+strict_optional = true
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.0",

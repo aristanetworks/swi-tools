@@ -27,7 +27,7 @@ pip3 install .
 0. Python3. For a version that works with python2, use the version 1.0 release.
 0. [uv](https://docs.astral.sh/uv/) - Python package and project manager.
 1. [Zip](http://infozip.sourceforge.net/) - Used in the `swi-signature` script to remove a signature from the SWI/X if you want to re-sign it, this comes preinstalled on many operating systems.
-2. [M2Crypto](https://pypi.org/project/M2Crypto/) - installed automatically with the setup script.
+2. [cryptography](https://pypi.org/project/cryptography/) - installed automatically with the setup script.
 3. [jsonschema](http://json-schema.org) - Used to verify the manifest.yaml, if added, when creating a SWIX.
 4. [pyparsing](https://pypi.org/project/pyparsing/)
 5. [PyYAML](https://pyyaml.org) - Used to read the manifest.yaml, if added, when creating a SWIX.

@@ -14,7 +14,7 @@
 
 import logging
 from typing import Annotated, Optional
-from switools.callbacks import _version_callback
+from switools import callbacks
 from switools.create import app as create_app
 from switools.crc32collision import app as collision_app
 from switools.signature import app as signature_app
@@ -35,7 +35,7 @@ def main(
          "--version",
          "-v",
          help="Show the application's version and exit.",
-         callback=_version_callback,
+         callback=callbacks.version,
          is_eager=True,
       ),
    ] = None,

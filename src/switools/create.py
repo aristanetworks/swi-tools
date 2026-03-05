@@ -22,7 +22,7 @@ import yaml
 from pathlib import Path
 from typing import Annotated, List, Optional
 
-from switools.callbacks import _path_exists_callback, _parent_path_exists_callback
+from switools import callbacks
 
 MANIFEST_YAML = 'manifest.yaml'
 
@@ -183,9 +183,9 @@ app = typer.Typer( add_completion=False, context_settings={"help_option_names": 
 
 @app.command( name="create" )
 def _create(
-      output_swix: Annotated[ Path, typer.Argument( help="Name of output file.", callback=_parent_path_exists_callback ) ],
-      rpms: Annotated[ List[ Path ], typer.Argument( help="An RPM to add to the SWIX.", callback=_path_exists_callback ) ],
-      manifest_yaml: Annotated[ Optional[ Path ], typer.Option( "--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=_path_exists_callback ) ] = None,
+      output_swix: Annotated[ Path, typer.Argument( help="Name of output file.", callback=callbacks.parent_path_exists ) ],
+      rpms: Annotated[ List[ Path ], typer.Argument( help="An RPM to add to the SWIX.", callback=callbacks.path_exists ) ],
+      manifest_yaml: Annotated[ Optional[ Path ], typer.Option( "--info", "-i", help=f"Location of {MANIFEST_YAML} file to add metadata to SWIX.", callback=callbacks.path_exists ) ] = None,
       force: Annotated[ Optional[ bool ], typer.Option( "--force", "-f", help="Overwrite OUTFILE.swix if it already exists." ) ] = False,
 ):
    """

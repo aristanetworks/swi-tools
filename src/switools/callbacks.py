@@ -18,20 +18,19 @@ from typing import List
 
 import typer
 
-# Initialise logging
 logger = logging.getLogger(__name__)
 
 
-def _version_callback(value: bool) -> None:
-    logger.debug(f"_version_callback: {value}")
+def version(value: bool) -> None:
+    logger.debug(f"callback.version: {value}")
     if value:
         from switools import __app_name__, __version__
         typer.echo(f"{__app_name__} v{__version__}")
         raise typer.Exit()
 
 
-def _verbosity_callback(param: typer.CallbackParam, value: bool) -> None:
-    logger.debug(f"_verbosity_callback: {value}")
+def verbosity(param: typer.CallbackParam, value: bool) -> None:
+    logger.debug(f"callback.verbosity: {value}")
     if value:
         if param.name == "verbose" and logger.parent.level > logging.INFO:
             logger.parent.setLevel(logging.INFO)
@@ -39,8 +38,8 @@ def _verbosity_callback(param: typer.CallbackParam, value: bool) -> None:
             logger.parent.setLevel(logging.DEBUG)
 
 
-def _path_exists_callback(value: Path | List[Path]) -> Path | List[Path]:
-    logger.debug(f"_path_exists_callback: {value}")
+def path_exists(value: Path | List[Path]) -> Path | List[Path]:
+    logger.debug(f"callback.path_exists: {value}")
     if bool(value):
         if type(value) is Path and not value.exists():
             raise typer.BadParameter(f"Path '{value}' does not exist")
@@ -51,8 +50,8 @@ def _path_exists_callback(value: Path | List[Path]) -> Path | List[Path]:
     return value
 
 
-def _parent_path_exists_callback(value: Path | List[Path]) -> Path | List[Path]:
-    logger.debug(f"_parent_path_exists_callback: {value}")
+def parent_path_exists(value: Path | List[Path]) -> Path | List[Path]:
+    logger.debug(f"callback.parent_path_exists: {value}")
     if bool(value):
         if type(value) is Path and not value.parent.exists():
             raise typer.BadParameter(f"Path '{value.parent}' does not exist")

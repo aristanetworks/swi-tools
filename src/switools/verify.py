@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Annotated, Optional
 
 from switools import signaturelib
-from switools.callbacks import _path_exists_callback
+from switools import callbacks
 
 ROOT_CA_FILE_NAME = 'ARISTA_ROOT_CA.crt'
 ROOT_CA = importlib.resources.files(__name__).joinpath(ROOT_CA_FILE_NAME).read_bytes()
@@ -260,8 +260,8 @@ app = typer.Typer( add_completion=False, context_settings={"help_option_names": 
 
 @app.command( name="verify" )
 def _verify(
-   swi_file: Annotated[ Path, typer.Argument( help="SWI/X file to verify.", callback=_path_exists_callback ) ],
-   ca_file: Annotated[ Optional[ Path ], typer.Option( "--CAfile", help="Root certificate to verify against.", callback=_path_exists_callback ) ] = None,
+   swi_file: Annotated[ Path, typer.Argument( help="SWI/X file to verify.", callback=callbacks.path_exists ) ],
+   ca_file: Annotated[ Optional[ Path ], typer.Option( "--CAfile", help="Root certificate to verify against.", callback=callbacks.path_exists ) ] = None,
 ):
    """
    Verify Arista SWI image or SWIX extension.

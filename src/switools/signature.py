@@ -20,7 +20,7 @@ from typing import Annotated, Optional
 from switools import crc32collision
 from switools import verify
 from switools import signaturelib
-from switools.callbacks import _path_exists_callback
+from switools import callbacks
 
 SIGN_VERSION = 1
 SWI_SIGNATURE_MAX_SIZE = 8192
@@ -332,8 +332,8 @@ app = typer.Typer( add_completion=False, context_settings={"help_option_names": 
 
 @app.command( name="prepare" )
 def _prepare(
-   swi_file: Annotated[ Path, typer.Argument( help="Path of the SWI/X to prepare for signing.", callback=_path_exists_callback ) ],
-   outfile: Annotated[ Optional[ Path ], typer.Option( "--outfile", help="Path to save SWI/X with null signature, if not replacing the input SWI/X.", callback=_path_exists_callback ) ] = None,
+   swi_file: Annotated[ Path, typer.Argument( help="Path of the SWI/X to prepare for signing.", callback=callbacks.path_exists ) ],
+   outfile: Annotated[ Optional[ Path ], typer.Option( "--outfile", help="Path to save SWI/X with null signature, if not replacing the input SWI/X.", callback=callbacks.path_exists ) ] = None,
    size: Annotated[ Optional[ int ], typer.Option( "--size", help="Size of null signature to add." ) ] = SWI_SIGNATURE_MAX_SIZE,
    force: Annotated[Optional[bool], typer.Option("--force-sign", help="Force signing the SWI/X if it's already signed.")] = False,
 ):
@@ -353,11 +353,11 @@ def _prepare(
 
 @app.command( name="sign" )
 def _sign(
-   swi_file: Annotated[ Path, typer.Argument( help="Path of the SWI/X to sign.", callback=_path_exists_callback ) ],
-   certificate: Annotated[ Path, typer.Argument( help="Path of the signing certificate.", callback=_path_exists_callback ) ],
-   root_certificate: Annotated[ Path, typer.Argument( help="Path of the root certificate of signing certificate to verify against.", callback=_path_exists_callback ) ],
-   signature_file: Annotated[ Optional[ Path ], typer.Option( "--signature", help="Path of base64-encoded SHA-256 signature file of EOS.swi or swix, signed by signing cerificate.", callback=_path_exists_callback ) ] = None,
-   signing_key_file: Annotated[ Optional[ Path ], typer.Option( "--key", help="Path of signing key, used to generate the signature.", callback=_path_exists_callback ) ] = None,
+   swi_file: Annotated[ Path, typer.Argument( help="Path of the SWI/X to sign.", callback=callbacks.path_exists ) ],
+   certificate: Annotated[ Path, typer.Argument( help="Path of the signing certificate.", callback=callbacks.path_exists ) ],
+   root_certificate: Annotated[ Path, typer.Argument( help="Path of the root certificate of signing certificate to verify against.", callback=callbacks.path_exists ) ],
+   signature_file: Annotated[ Optional[ Path ], typer.Option( "--signature", help="Path of base64-encoded SHA-256 signature file of EOS.swi or swix, signed by signing cerificate.", callback=callbacks.path_exists ) ] = None,
+   signing_key_file: Annotated[ Optional[ Path ], typer.Option( "--key", help="Path of signing key, used to generate the signature.", callback=callbacks.path_exists ) ] = None,
 ):
    """
    Sign an Arista SWI/X.

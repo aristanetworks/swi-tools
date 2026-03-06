@@ -3,8 +3,13 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 
+import typer
+
 from binascii import crc32
-import argparse
+from pathlib import Path
+from typing import Annotated
+
+from switools import callbacks
 
 # Utility functions to create CRC32 collisions
 
@@ -49,20 +54,19 @@ def matchingBytes( crcToMatch, crcToChange ):
       crcBytes.append( byte )
    return crcBytes
 
-# Usage: filetomatch filetochange
-def main():
-   helpText = "Generate CRC32 collision for two files"
-   parser = argparse.ArgumentParser( description=helpText )
-   parser.add_argument( "fileToMatch", help="File whose CRC32 is to be matched" )
-   parser.add_argument( "fileToChange", 
-                        help="File to produce a new CRC32 that matches the first" )
-   args = parser.parse_args()
-   fileToMatch = args.fileToMatch
-   fileToChange = args.fileToChange
+app = typer.Typer( add_completion=False, context_settings={"help_option_names": [ "-h", "--help" ]} )
 
-   with open( fileToMatch, 'rb' ) as f:
+@app.command( name="collision" )
+def _collision(
+   file_to_match: Annotated[ Path, typer.Argument( help="File whose CRC32 is to be matched.", callback=callbacks.path_exists ) ],
+   file_to_change: Annotated[ Path, typer.Argument( help="File to produce a new CRC32 that matches the first.", callback=callbacks.path_exists ) ],
+):
+   """
+   Generate CRC32 collision for two files.
+   """
+   with open( file_to_match, 'rb' ) as f:
       crcToMatch = crc32( f.read() ) & 0xffffffff
-   with open( fileToChange, 'rb' ) as f:
+   with open( file_to_change, 'rb' ) as f:
       crcToChange = crc32( f.read() ) & 0xffffffff
 
    crcBytes = matchingBytes( crcToMatch, crcToChange )
@@ -72,4 +76,4 @@ def main():
                            crcBytes[ 3 ] ) )
 
 if __name__ == '__main__':
-   main()
+   app()

@@ -5,7 +5,7 @@
 
 import base64
 import binascii
-import importlib
+import importlib.resources
 import os
 import sys
 import tempfile

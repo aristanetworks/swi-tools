@@ -9,7 +9,7 @@ This module is responsible for packaging a SWIX file.
 
 import functools
 import hashlib
-import importlib
+import importlib.resources
 import jsonschema
 import os
 import pyparsing
